@@ -433,3 +433,239 @@ data class BreachListResult(
 data class BreachResult(
     val breach: BreachRecord
 )
+
+// =============================================================================
+// Voice Analysis
+// =============================================================================
+
+/**
+ * A segment of a voice transcription with timestamps.
+ */
+@Serializable
+data class TranscriptionSegment(
+    val start: Double,
+    val end: Double,
+    val text: String
+)
+
+/**
+ * Result of voice transcription.
+ */
+@Serializable
+data class TranscriptionResult(
+    val text: String,
+    val language: String? = null,
+    val duration: Double? = null,
+    val segments: List<TranscriptionSegment>? = null
+)
+
+/**
+ * Result of voice safety analysis.
+ */
+@Serializable
+data class VoiceAnalysisResult(
+    @SerialName("file_id") val fileId: String? = null,
+    val transcription: TranscriptionResult? = null,
+    val analysis: JsonObject? = null,
+    @SerialName("overall_risk_score") val overallRiskScore: Double? = null,
+    @SerialName("overall_severity") val overallSeverity: String? = null,
+    @SerialName("external_id") val externalId: String? = null,
+    @SerialName("customer_id") val customerId: String? = null,
+    val metadata: JsonObject? = null
+)
+
+// =============================================================================
+// Image Analysis
+// =============================================================================
+
+/**
+ * Vision analysis details for an image.
+ */
+@Serializable
+data class VisionResult(
+    @SerialName("extracted_text") val extractedText: String? = null,
+    @SerialName("visual_categories") val visualCategories: List<String>? = null,
+    @SerialName("visual_severity") val visualSeverity: String? = null,
+    @SerialName("visual_confidence") val visualConfidence: Double? = null,
+    @SerialName("visual_description") val visualDescription: String? = null,
+    @SerialName("contains_text") val containsText: Boolean? = null,
+    @SerialName("contains_faces") val containsFaces: Boolean? = null
+)
+
+/**
+ * Result of image safety analysis.
+ */
+@Serializable
+data class ImageAnalysisResult(
+    @SerialName("file_id") val fileId: String? = null,
+    val vision: VisionResult? = null,
+    @SerialName("text_analysis") val textAnalysis: JsonObject? = null,
+    @SerialName("overall_risk_score") val overallRiskScore: Double? = null,
+    @SerialName("overall_severity") val overallSeverity: String? = null,
+    @SerialName("external_id") val externalId: String? = null,
+    @SerialName("customer_id") val customerId: String? = null,
+    val metadata: JsonObject? = null
+)
+
+// =============================================================================
+// Webhooks
+// =============================================================================
+
+/**
+ * A webhook configuration.
+ */
+@Serializable
+data class Webhook(
+    val id: String,
+    val url: String,
+    val events: List<String>,
+    val active: Boolean,
+    val secret: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null
+)
+
+/**
+ * Result of listing webhooks.
+ */
+@Serializable
+data class WebhookListResult(val webhooks: List<Webhook>)
+
+/**
+ * Input for creating a webhook.
+ */
+data class CreateWebhookInput(
+    val url: String,
+    val events: List<String>,
+    val active: Boolean = true
+)
+
+/**
+ * Result of creating a webhook.
+ */
+@Serializable
+data class CreateWebhookResult(val message: String, val webhook: Webhook)
+
+/**
+ * Input for updating a webhook.
+ */
+data class UpdateWebhookInput(
+    val url: String? = null,
+    val events: List<String>? = null,
+    val active: Boolean? = null
+)
+
+/**
+ * Result of updating a webhook.
+ */
+@Serializable
+data class UpdateWebhookResult(val message: String, val webhook: Webhook)
+
+/**
+ * Result of deleting a webhook.
+ */
+@Serializable
+data class DeleteWebhookResult(val message: String)
+
+/**
+ * Result of testing a webhook.
+ */
+@Serializable
+data class TestWebhookResult(
+    val message: String,
+    @SerialName("status_code") val statusCode: Int? = null
+)
+
+/**
+ * Result of regenerating a webhook secret.
+ */
+@Serializable
+data class RegenerateSecretResult(val message: String, val secret: String)
+
+// =============================================================================
+// Pricing
+// =============================================================================
+
+/**
+ * A pricing plan summary.
+ */
+@Serializable
+data class PricingPlan(
+    val name: String,
+    val price: String,
+    val messages: String,
+    val features: List<String>
+)
+
+/**
+ * Result of listing pricing plans.
+ */
+@Serializable
+data class PricingResult(val plans: List<PricingPlan>)
+
+/**
+ * A detailed pricing plan.
+ */
+@Serializable
+data class PricingDetailPlan(
+    val name: String,
+    val tier: String,
+    val price: JsonObject,
+    val limits: JsonObject,
+    val features: JsonObject,
+    val endpoints: List<String>
+)
+
+/**
+ * Result of listing detailed pricing plans.
+ */
+@Serializable
+data class PricingDetailsResult(val plans: List<PricingDetailPlan>)
+
+// =============================================================================
+// Usage
+// =============================================================================
+
+/**
+ * Usage data for a single day.
+ */
+@Serializable
+data class UsageDay(
+    val date: String,
+    @SerialName("total_requests") val totalRequests: Int,
+    @SerialName("success_requests") val successRequests: Int,
+    @SerialName("error_requests") val errorRequests: Int
+)
+
+/**
+ * Result of usage history query.
+ */
+@Serializable
+data class UsageHistoryResult(
+    @SerialName("api_key_id") val apiKeyId: String,
+    val days: List<UsageDay>
+)
+
+/**
+ * Result of usage breakdown by tool.
+ */
+@Serializable
+data class UsageByToolResult(
+    val date: String,
+    val tools: Map<String, Int>,
+    val endpoints: Map<String, Int>
+)
+
+/**
+ * Result of monthly usage summary.
+ */
+@Serializable
+data class UsageMonthlyResult(
+    val tier: String,
+    @SerialName("tier_display_name") val tierDisplayName: String,
+    val billing: JsonObject,
+    val usage: JsonObject,
+    @SerialName("rate_limit") val rateLimit: JsonObject,
+    val recommendations: JsonObject? = null,
+    val links: JsonObject
+)

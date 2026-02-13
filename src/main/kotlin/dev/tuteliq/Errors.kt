@@ -64,3 +64,19 @@ class NetworkException(
     message: String,
     details: Any? = null
 ) : TuteliqException(message, details)
+
+/**
+ * Thrown when the monthly or daily quota is exceeded.
+ */
+class QuotaExceededException(
+    message: String,
+    details: Any? = null
+) : TuteliqException(message, details)
+
+/**
+ * Thrown when the current tier does not have access to a feature.
+ */
+class TierAccessException(
+    message: String,
+    details: Any? = null
+) : TuteliqException(message, details)

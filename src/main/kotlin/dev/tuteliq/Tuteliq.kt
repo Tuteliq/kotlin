@@ -6,10 +6,12 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.delay
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
 /**
@@ -70,6 +72,14 @@ class Tuteliq(
         require(apiKey.length >= 10) { "API key appears to be invalid" }
     }
 
+    companion object {
+        private const val SDK_IDENTIFIER = "Kotlin SDK"
+    }
+
+    private fun resolvePlatform(platform: String? = null): String {
+        return if (!platform.isNullOrEmpty()) "$platform - $SDK_IDENTIFIER" else SDK_IDENTIFIER
+    }
+
     /**
      * Close the HTTP client.
      */
@@ -98,7 +108,8 @@ class Tuteliq(
     ): BullyingResult {
         val body = buildJsonObject {
             put("text", content)
-            context?.let { put("context", json.encodeToJsonElement(it)) }
+            val ctx = context ?: AnalysisContext()
+            put("context", json.encodeToJsonElement(ctx.copy(platform = resolvePlatform(ctx.platform))))
             externalId?.let { put("external_id", it) }
             metadata?.let { put("metadata", mapToJsonObject(it)) }
         }
@@ -135,17 +146,15 @@ class Tuteliq(
                 }
             }
             val contextObj = buildJsonObject {
+                put("platform", resolvePlatform(input.context?.platform))
                 input.childAge?.let { put("child_age", it) }
                 input.context?.let {
                     it.language?.let { lang -> put("language", lang) }
                     it.ageGroup?.let { ag -> put("age_group", ag) }
                     it.relationship?.let { rel -> put("relationship", rel) }
-                    it.platform?.let { plat -> put("platform", plat) }
                 }
             }
-            if (contextObj.isNotEmpty()) {
-                put("context", contextObj)
-            }
+            put("context", contextObj)
             input.externalId?.let { put("external_id", it) }
             input.metadata?.let { put("metadata", mapToJsonObject(it)) }
         }
@@ -170,7 +179,8 @@ class Tuteliq(
     ): UnsafeResult {
         val body = buildJsonObject {
             put("text", content)
-            context?.let { put("context", json.encodeToJsonElement(it)) }
+            val ctx = context ?: AnalysisContext()
+            put("context", json.encodeToJsonElement(ctx.copy(platform = resolvePlatform(ctx.platform))))
             externalId?.let { put("external_id", it) }
             metadata?.let { put("metadata", mapToJsonObject(it)) }
         }
@@ -302,7 +312,8 @@ class Tuteliq(
                     put("text", content)
                 }
             }
-            context?.let { put("context", json.encodeToJsonElement(it)) }
+            val ctx = context ?: AnalysisContext()
+            put("context", json.encodeToJsonElement(ctx.copy(platform = resolvePlatform(ctx.platform))))
             externalId?.let { put("external_id", it) }
             metadata?.let { put("metadata", mapToJsonObject(it)) }
         }
@@ -335,7 +346,8 @@ class Tuteliq(
                     }
                 }
             }
-            input.context?.let { put("context", json.encodeToJsonElement(it)) }
+            val ctx = input.context ?: AnalysisContext()
+            put("context", json.encodeToJsonElement(ctx.copy(platform = resolvePlatform(ctx.platform))))
             input.externalId?.let { put("external_id", it) }
             input.metadata?.let { put("metadata", mapToJsonObject(it)) }
         }
@@ -357,6 +369,7 @@ class Tuteliq(
         val body = buildJsonObject {
             put("role", (input.audience ?: Audience.PARENT).name.lowercase())
             put("situation", input.situation)
+            put("context", buildJsonObject { put("platform", resolvePlatform()) })
             input.childAge?.let { put("child_age", it) }
             input.severity?.let { put("severity", it.name.lowercase()) }
             input.externalId?.let { put("external_id", it) }
@@ -386,6 +399,7 @@ class Tuteliq(
                     }
                 }
             }
+            put("context", buildJsonObject { put("platform", resolvePlatform()) })
             val metaObj = buildJsonObject {
                 input.childAge?.let { put("child_age", it) }
                 input.incidentType?.let { put("type", it) }
@@ -521,6 +535,232 @@ class Tuteliq(
     }
 
     // =========================================================================
+    // Voice Analysis
+    // =========================================================================
+
+    /**
+     * Analyze voice content for safety concerns.
+     *
+     * @param file Audio file bytes.
+     * @param filename Name of the audio file.
+     * @param analysisType Type of analysis: "all", "transcription", or "safety".
+     * @param fileId Optional file identifier.
+     * @param externalId Your identifier for correlation.
+     * @param customerId Customer identifier.
+     * @param metadata Custom metadata.
+     * @param ageGroup Age group of the speaker.
+     * @param language Language of the audio.
+     * @param platform Platform identifier.
+     * @param childAge Age of the child.
+     * @return VoiceAnalysisResult with transcription and safety analysis.
+     */
+    suspend fun analyzeVoice(
+        file: ByteArray,
+        filename: String,
+        analysisType: String = "all",
+        fileId: String? = null,
+        externalId: String? = null,
+        customerId: String? = null,
+        metadata: Map<String, Any>? = null,
+        ageGroup: String? = null,
+        language: String? = null,
+        platform: String? = null,
+        childAge: Int? = null,
+    ): VoiceAnalysisResult {
+        val data = multipartRequest("/api/v1/safety/voice") {
+            append("file", file, Headers.build {
+                append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
+            })
+            append("analysis_type", analysisType)
+            append("platform", resolvePlatform(platform))
+            fileId?.let { append("file_id", it) }
+            externalId?.let { append("external_id", it) }
+            customerId?.let { append("customer_id", it) }
+            metadata?.let { append("metadata", json.encodeToString(mapToJsonObject(it))) }
+            ageGroup?.let { append("age_group", it) }
+            language?.let { append("language", it) }
+            childAge?.let { append("child_age", it.toString()) }
+        }
+        return json.decodeFromJsonElement(data)
+    }
+
+    // =========================================================================
+    // Image Analysis
+    // =========================================================================
+
+    /**
+     * Analyze image content for safety concerns.
+     *
+     * @param file Image file bytes.
+     * @param filename Name of the image file.
+     * @param analysisType Type of analysis: "all", "vision", or "safety".
+     * @param fileId Optional file identifier.
+     * @param externalId Your identifier for correlation.
+     * @param customerId Customer identifier.
+     * @param metadata Custom metadata.
+     * @param ageGroup Age group context.
+     * @param platform Platform identifier.
+     * @return ImageAnalysisResult with vision and safety analysis.
+     */
+    suspend fun analyzeImage(
+        file: ByteArray,
+        filename: String,
+        analysisType: String = "all",
+        fileId: String? = null,
+        externalId: String? = null,
+        customerId: String? = null,
+        metadata: Map<String, Any>? = null,
+        ageGroup: String? = null,
+        platform: String? = null,
+    ): ImageAnalysisResult {
+        val data = multipartRequest("/api/v1/safety/image") {
+            append("file", file, Headers.build {
+                append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
+            })
+            append("analysis_type", analysisType)
+            append("platform", resolvePlatform(platform))
+            fileId?.let { append("file_id", it) }
+            externalId?.let { append("external_id", it) }
+            customerId?.let { append("customer_id", it) }
+            metadata?.let { append("metadata", json.encodeToString(mapToJsonObject(it))) }
+            ageGroup?.let { append("age_group", it) }
+        }
+        return json.decodeFromJsonElement(data)
+    }
+
+    // =========================================================================
+    // Webhooks
+    // =========================================================================
+
+    /**
+     * List all configured webhooks.
+     *
+     * @return WebhookListResult with all webhooks.
+     */
+    suspend fun listWebhooks(): WebhookListResult {
+        val data: WebhookListResult = request("GET", "/api/v1/webhooks")
+        return data
+    }
+
+    /**
+     * Create a new webhook.
+     *
+     * @param input CreateWebhookInput with URL, events, and active status.
+     * @return CreateWebhookResult with the created webhook.
+     */
+    suspend fun createWebhook(input: CreateWebhookInput): CreateWebhookResult {
+        val body = buildJsonObject {
+            put("url", input.url)
+            putJsonArray("events") { input.events.forEach { add(it) } }
+            put("active", input.active)
+        }
+        return request("/api/v1/webhooks", body)
+    }
+
+    /**
+     * Update an existing webhook.
+     *
+     * @param webhookId ID of the webhook to update.
+     * @param input UpdateWebhookInput with fields to update.
+     * @return UpdateWebhookResult with the updated webhook.
+     */
+    suspend fun updateWebhook(webhookId: String, input: UpdateWebhookInput): UpdateWebhookResult {
+        val body = buildJsonObject {
+            input.url?.let { put("url", it) }
+            input.events?.let { putJsonArray("events") { it.forEach { e -> add(e) } } }
+            input.active?.let { put("active", it) }
+        }
+        return requestWithMethod("PATCH", "/api/v1/webhooks/$webhookId", body)
+    }
+
+    /**
+     * Delete a webhook.
+     *
+     * @param webhookId ID of the webhook to delete.
+     * @return DeleteWebhookResult confirmation.
+     */
+    suspend fun deleteWebhook(webhookId: String): DeleteWebhookResult {
+        return request("DELETE", "/api/v1/webhooks/$webhookId")
+    }
+
+    /**
+     * Send a test event to a webhook.
+     *
+     * @param webhookId ID of the webhook to test.
+     * @return TestWebhookResult with delivery status.
+     */
+    suspend fun testWebhook(webhookId: String): TestWebhookResult {
+        return requestWithMethod("POST", "/api/v1/webhooks/$webhookId/test", null)
+    }
+
+    /**
+     * Regenerate the signing secret for a webhook.
+     *
+     * @param webhookId ID of the webhook.
+     * @return RegenerateSecretResult with the new secret.
+     */
+    suspend fun regenerateWebhookSecret(webhookId: String): RegenerateSecretResult {
+        return requestWithMethod("POST", "/api/v1/webhooks/$webhookId/regenerate-secret", null)
+    }
+
+    // =========================================================================
+    // Pricing
+    // =========================================================================
+
+    /**
+     * Get available pricing plans.
+     *
+     * @return PricingResult with plan summaries.
+     */
+    suspend fun getPricing(): PricingResult {
+        return request("GET", "/api/v1/pricing")
+    }
+
+    /**
+     * Get detailed pricing information including limits and features.
+     *
+     * @return PricingDetailsResult with detailed plan information.
+     */
+    suspend fun getPricingDetails(): PricingDetailsResult {
+        return request("GET", "/api/v1/pricing/details")
+    }
+
+    // =========================================================================
+    // Usage
+    // =========================================================================
+
+    /**
+     * Get usage history.
+     *
+     * @param days Number of days to retrieve (default: 30).
+     * @return UsageHistoryResult with daily usage data.
+     */
+    suspend fun getUsageHistory(days: Int? = null): UsageHistoryResult {
+        val params = if (days != null) "?days=$days" else ""
+        return request("GET", "/api/v1/usage/history$params")
+    }
+
+    /**
+     * Get usage breakdown by tool/endpoint.
+     *
+     * @param date Date to query in YYYY-MM-DD format (default: today).
+     * @return UsageByToolResult with per-tool usage counts.
+     */
+    suspend fun getUsageByTool(date: String? = null): UsageByToolResult {
+        val params = if (date != null) "?date=$date" else ""
+        return request("GET", "/api/v1/usage/by-tool$params")
+    }
+
+    /**
+     * Get monthly usage summary with billing and rate limit info.
+     *
+     * @return UsageMonthlyResult with monthly overview.
+     */
+    suspend fun getUsageMonthly(): UsageMonthlyResult {
+        return request("GET", "/api/v1/usage/monthly")
+    }
+
+    // =========================================================================
     // Private Methods
     // =========================================================================
 
@@ -543,6 +783,10 @@ class Tuteliq(
             } catch (e: ValidationException) {
                 throw e
             } catch (e: NotFoundException) {
+                throw e
+            } catch (e: QuotaExceededException) {
+                throw e
+            } catch (e: TierAccessException) {
                 throw e
             } catch (e: Exception) {
                 lastException = e
@@ -588,8 +832,13 @@ class Tuteliq(
 
     private suspend fun handleErrorResponse(response: HttpResponse): Nothing {
         val status = response.status.value
+        val body = response.bodyAsText()
+        handleError(status, body)
+    }
+
+    private fun handleError(status: Int, body: String): Nothing {
         val (message, details) = try {
-            val data = response.body<JsonObject>()
+            val data = json.parseToJsonElement(body).jsonObject
             val error = data["error"]?.jsonObject
             val msg = error?.get("message")?.jsonPrimitive?.content ?: "Request failed"
             val det = error?.get("details")
@@ -601,11 +850,57 @@ class Tuteliq(
         throw when (status) {
             400 -> ValidationException(message, details)
             401 -> AuthenticationException(message, details)
+            403 -> {
+                val msg = message.lowercase()
+                when {
+                    msg.contains("quota") -> QuotaExceededException(message, details)
+                    msg.contains("tier") -> TierAccessException(message, details)
+                    else -> TierAccessException(message, details)
+                }
+            }
             404 -> NotFoundException(message, details)
             429 -> RateLimitException(message, details)
             in 500..599 -> ServerException(message, status, details)
             else -> TuteliqException(message, details)
         }
+    }
+
+    private fun updateUsage(response: HttpResponse) {
+        lastRequestId = response.headers["x-request-id"]
+
+        val limit = response.headers["x-monthly-limit"]?.toIntOrNull()
+        val used = response.headers["x-monthly-used"]?.toIntOrNull()
+        val remaining = response.headers["x-monthly-remaining"]?.toIntOrNull()
+
+        if (limit != null && used != null && remaining != null) {
+            usage = Usage(limit, used, remaining)
+        }
+    }
+
+    private suspend fun multipartRequest(path: String, formBuilder: FormBuilder.() -> Unit): JsonObject {
+        val url = "$baseUrl$path"
+        for (attempt in 0..maxRetries) {
+            try {
+                val response = client.submitFormWithBinaryData(
+                    url = url,
+                    formData = formData(formBuilder)
+                ) {
+                    header("X-API-Key", apiKey)
+                }
+                val body = response.bodyAsText()
+                if (response.status.value >= 400) {
+                    handleError(response.status.value, body)
+                }
+                updateUsage(response)
+                return json.parseToJsonElement(body).jsonObject
+            } catch (e: TuteliqException) {
+                throw e
+            } catch (e: Exception) {
+                if (attempt == maxRetries) throw NetworkException(e.message ?: "Network error")
+                delay(retryDelay * (1L shl attempt))
+            }
+        }
+        throw NetworkException("Max retries exceeded")
     }
 
     private fun mapToJsonObject(map: Map<String, Any?>): JsonObject {
