@@ -1,4 +1,4 @@
-package dev.safenest
+package dev.tuteliq
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

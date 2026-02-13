@@ -1,11 +1,11 @@
-package dev.safenest
+package dev.tuteliq
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 
-class SafeNestTest {
+class TuteliqTest {
 
     // =========================================================================
     // Client Initialization
@@ -13,7 +13,7 @@ class SafeNestTest {
 
     @Test
     fun `client creation succeeds with valid API key`() {
-        val client = SafeNest("test-api-key-12345")
+        val client = Tuteliq("test-api-key-12345")
         assertNotNull(client)
         client.close()
     }
@@ -21,20 +21,20 @@ class SafeNestTest {
     @Test
     fun `client creation fails with empty API key`() {
         assertFailsWith<IllegalArgumentException> {
-            SafeNest("")
+            Tuteliq("")
         }
     }
 
     @Test
     fun `client creation fails with short API key`() {
         assertFailsWith<IllegalArgumentException> {
-            SafeNest("short")
+            Tuteliq("short")
         }
     }
 
     @Test
     fun `client accepts custom options`() {
-        val client = SafeNest(
+        val client = Tuteliq(
             apiKey = "test-api-key-12345",
             timeout = 60_000L,
             maxRetries = 5,

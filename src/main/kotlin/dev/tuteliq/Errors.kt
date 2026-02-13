@@ -1,9 +1,9 @@
-package dev.safenest
+package dev.tuteliq
 
 /**
- * Base exception for SafeNest SDK errors.
+ * Base exception for Tuteliq SDK errors.
  */
-open class SafeNestException(
+open class TuteliqException(
     override val message: String,
     val details: Any? = null
 ) : Exception(message)
@@ -14,7 +14,7 @@ open class SafeNestException(
 class AuthenticationException(
     message: String,
     details: Any? = null
-) : SafeNestException(message, details)
+) : TuteliqException(message, details)
 
 /**
  * Thrown when rate limit is exceeded.
@@ -22,7 +22,7 @@ class AuthenticationException(
 class RateLimitException(
     message: String,
     details: Any? = null
-) : SafeNestException(message, details)
+) : TuteliqException(message, details)
 
 /**
  * Thrown when request validation fails.
@@ -30,7 +30,7 @@ class RateLimitException(
 class ValidationException(
     message: String,
     details: Any? = null
-) : SafeNestException(message, details)
+) : TuteliqException(message, details)
 
 /**
  * Thrown when a resource is not found.
@@ -38,7 +38,7 @@ class ValidationException(
 class NotFoundException(
     message: String,
     details: Any? = null
-) : SafeNestException(message, details)
+) : TuteliqException(message, details)
 
 /**
  * Thrown when the server returns a 5xx error.
@@ -47,7 +47,7 @@ class ServerException(
     message: String,
     val statusCode: Int,
     details: Any? = null
-) : SafeNestException(message, details)
+) : TuteliqException(message, details)
 
 /**
  * Thrown when a request times out.
@@ -55,7 +55,7 @@ class ServerException(
 class TimeoutException(
     message: String,
     details: Any? = null
-) : SafeNestException(message, details)
+) : TuteliqException(message, details)
 
 /**
  * Thrown when a network error occurs.
@@ -63,4 +63,4 @@ class TimeoutException(
 class NetworkException(
     message: String,
     details: Any? = null
-) : SafeNestException(message, details)
+) : TuteliqException(message, details)

@@ -1,4 +1,4 @@
-package dev.safenest
+package dev.tuteliq
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -259,6 +259,96 @@ data class AccountExportResult(
     val data: JsonObject
 )
 
+// =============================================================================
+// Consent Management (GDPR Article 7)
+// =============================================================================
+
+@Serializable
+enum class ConsentType {
+    @SerialName("data_processing") DATA_PROCESSING,
+    @SerialName("analytics") ANALYTICS,
+    @SerialName("marketing") MARKETING,
+    @SerialName("third_party_sharing") THIRD_PARTY_SHARING,
+    @SerialName("child_safety_monitoring") CHILD_SAFETY_MONITORING
+}
+
+@Serializable
+enum class ConsentStatus {
+    @SerialName("granted") GRANTED,
+    @SerialName("withdrawn") WITHDRAWN
+}
+
+data class RecordConsentInput(
+    val consentType: ConsentType,
+    val version: String
+)
+
+@Serializable
+data class ConsentRecord(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    @SerialName("consent_type") val consentType: String,
+    val status: String,
+    val version: String,
+    @SerialName("created_at") val createdAt: String
+)
+
+@Serializable
+data class ConsentActionResult(
+    val message: String,
+    val consent: ConsentRecord
+)
+
+@Serializable
+data class ConsentStatusResult(
+    val consents: List<ConsentRecord>
+)
+
+// =============================================================================
+// Right to Rectification (GDPR Article 16)
+// =============================================================================
+
+data class RectifyDataInput(
+    val collection: String,
+    val documentId: String,
+    val fields: Map<String, Any?>
+)
+
+@Serializable
+data class RectifyDataResult(
+    val message: String,
+    @SerialName("updated_fields") val updatedFields: List<String>
+)
+
+// =============================================================================
+// Audit Logs (GDPR Article 15)
+// =============================================================================
+
+@Serializable
+enum class AuditAction {
+    @SerialName("data_access") DATA_ACCESS,
+    @SerialName("data_export") DATA_EXPORT,
+    @SerialName("data_deletion") DATA_DELETION,
+    @SerialName("data_rectification") DATA_RECTIFICATION,
+    @SerialName("consent_granted") CONSENT_GRANTED,
+    @SerialName("consent_withdrawn") CONSENT_WITHDRAWN,
+    @SerialName("breach_notification") BREACH_NOTIFICATION
+}
+
+@Serializable
+data class AuditLogEntry(
+    val id: String,
+    @SerialName("user_id") val userId: String,
+    val action: String,
+    val details: JsonObject? = null,
+    @SerialName("created_at") val createdAt: String
+)
+
+@Serializable
+data class AuditLogsResult(
+    @SerialName("audit_logs") val auditLogs: List<AuditLogEntry>
+)
+
 /**
  * API usage information.
  */
@@ -266,4 +356,80 @@ data class Usage(
     val limit: Int,
     val used: Int,
     val remaining: Int
+)
+
+// =============================================================================
+// Breach Management (GDPR Article 33/34)
+// =============================================================================
+
+@Serializable
+enum class BreachSeverity {
+    @SerialName("low") LOW,
+    @SerialName("medium") MEDIUM,
+    @SerialName("high") HIGH,
+    @SerialName("critical") CRITICAL
+}
+
+@Serializable
+enum class BreachStatus {
+    @SerialName("detected") DETECTED,
+    @SerialName("investigating") INVESTIGATING,
+    @SerialName("contained") CONTAINED,
+    @SerialName("reported") REPORTED,
+    @SerialName("resolved") RESOLVED
+}
+
+@Serializable
+enum class BreachNotificationStatus {
+    @SerialName("pending") PENDING,
+    @SerialName("users_notified") USERS_NOTIFIED,
+    @SerialName("dpa_notified") DPA_NOTIFIED,
+    @SerialName("completed") COMPLETED
+}
+
+data class LogBreachInput(
+    val title: String,
+    val description: String,
+    val severity: BreachSeverity,
+    val affectedUserIds: List<String>,
+    val dataCategories: List<String>,
+    val reportedBy: String
+)
+
+data class UpdateBreachInput(
+    val status: BreachStatus,
+    val notificationStatus: BreachNotificationStatus? = null,
+    val notes: String? = null
+)
+
+@Serializable
+data class BreachRecord(
+    val id: String,
+    val title: String,
+    val description: String,
+    val severity: BreachSeverity,
+    val status: BreachStatus,
+    @SerialName("notification_status") val notificationStatus: BreachNotificationStatus,
+    @SerialName("affected_user_ids") val affectedUserIds: List<String>,
+    @SerialName("data_categories") val dataCategories: List<String>,
+    @SerialName("reported_by") val reportedBy: String,
+    @SerialName("notification_deadline") val notificationDeadline: String,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String
+)
+
+@Serializable
+data class LogBreachResult(
+    val message: String,
+    val breach: BreachRecord
+)
+
+@Serializable
+data class BreachListResult(
+    val breaches: List<BreachRecord>
+)
+
+@Serializable
+data class BreachResult(
+    val breach: BreachRecord
 )

@@ -1,23 +1,23 @@
 <p align="center">
-  <img src="./assets/logo.png" alt="SafeNest" width="200" />
+  <img src="./assets/logo.png" alt="Tuteliq" width="200" />
 </p>
 
-<h1 align="center">SafeNest Kotlin SDK</h1>
+<h1 align="center">Tuteliq Kotlin SDK</h1>
 
 <p align="center">
-  <strong>Official Kotlin SDK for the SafeNest API</strong><br>
+  <strong>Official Kotlin SDK for the Tuteliq API</strong><br>
   AI-powered child safety analysis
 </p>
 
 <p align="center">
-  <a href="https://search.maven.org/artifact/dev.safenest/safenest"><img src="https://img.shields.io/maven-central/v/dev.safenest/safenest.svg" alt="Maven Central"></a>
-  <a href="https://github.com/SafeNestSDK/kotlin/actions"><img src="https://img.shields.io/github/actions/workflow/status/SafeNestSDK/kotlin/ci.yml" alt="build status"></a>
-  <a href="https://github.com/SafeNestSDK/kotlin/blob/main/LICENSE"><img src="https://img.shields.io/github/license/SafeNestSDK/kotlin.svg" alt="license"></a>
+  <a href="https://search.maven.org/artifact/dev.tuteliq/tuteliq"><img src="https://img.shields.io/maven-central/v/dev.tuteliq/tuteliq.svg" alt="Maven Central"></a>
+  <a href="https://github.com/Tuteliq/kotlin/actions"><img src="https://img.shields.io/github/actions/workflow/status/Tuteliq/kotlin/ci.yml" alt="build status"></a>
+  <a href="https://github.com/Tuteliq/kotlin/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Tuteliq/kotlin.svg" alt="license"></a>
 </p>
 
 <p align="center">
-  <a href="https://api.safenest.dev/docs">API Docs</a> •
-  <a href="https://safenest.app">Dashboard</a> •
+  <a href="https://api.tuteliq.ai/docs">API Docs</a> •
+  <a href="https://tuteliq.app">Dashboard</a> •
   <a href="https://discord.gg/7kbTeRYRXD">Discord</a>
 </p>
 
@@ -29,7 +29,7 @@
 
 ```kotlin
 dependencies {
-    implementation("dev.safenest:safenest:1.0.0")
+    implementation("dev.tuteliq:tuteliq:1.0.0")
 }
 ```
 
@@ -37,7 +37,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'dev.safenest:safenest:1.0.0'
+    implementation 'dev.tuteliq:tuteliq:1.0.0'
 }
 ```
 
@@ -45,8 +45,8 @@ dependencies {
 
 ```xml
 <dependency>
-    <groupId>dev.safenest</groupId>
-    <artifactId>safenest</artifactId>
+    <groupId>dev.tuteliq</groupId>
+    <artifactId>tuteliq</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
@@ -61,11 +61,11 @@ dependencies {
 ## Quick Start
 
 ```kotlin
-import dev.safenest.*
+import dev.tuteliq.*
 import kotlinx.coroutines.runBlocking
 
 fun main() = runBlocking {
-    val client = SafeNest(apiKey = "your-api-key")
+    val client = Tuteliq(apiKey = "your-api-key")
 
     // Quick safety analysis
     val result = client.analyze("Message to check")
@@ -86,13 +86,13 @@ fun main() = runBlocking {
 ### Initialization
 
 ```kotlin
-import dev.safenest.SafeNest
+import dev.tuteliq.Tuteliq
 
 // Simple
-val client = SafeNest(apiKey = "your-api-key")
+val client = Tuteliq(apiKey = "your-api-key")
 
 // With options
-val client = SafeNest(
+val client = Tuteliq(
     apiKey = "your-api-key",
     timeout = 30_000L,     // Request timeout in milliseconds
     maxRetries = 3,        // Retry attempts
@@ -116,7 +116,7 @@ if (result.isBullying) {
 ### Grooming Detection
 
 ```kotlin
-import dev.safenest.*
+import dev.tuteliq.*
 
 val result = client.detectGrooming(
     DetectGroomingInput(
@@ -170,7 +170,7 @@ println("Followup: ${result.recommendedFollowup}")
 ### Action Plan
 
 ```kotlin
-import dev.safenest.*
+import dev.tuteliq.*
 
 val plan = client.getActionPlan(
     GetActionPlanInput(
@@ -188,7 +188,7 @@ println("Tone: ${plan.tone}")
 ### Incident Report
 
 ```kotlin
-import dev.safenest.*
+import dev.tuteliq.*
 
 val report = client.generateReport(
     GenerateReportInput(
@@ -246,7 +246,7 @@ println("Request ID: ${client.lastRequestId}")
 ## Error Handling
 
 ```kotlin
-import dev.safenest.*
+import dev.tuteliq.*
 
 try {
     val result = client.detectBullying("test")
@@ -262,7 +262,7 @@ try {
     println("Timeout: ${e.message}")
 } catch (e: NetworkException) {
     println("Network error: ${e.message}")
-} catch (e: SafeNestException) {
+} catch (e: TuteliqException) {
     println("Error: ${e.message}")
 }
 ```
@@ -272,12 +272,12 @@ try {
 ## Android Example
 
 ```kotlin
-import dev.safenest.*
+import dev.tuteliq.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class SafetyChecker(private val apiKey: String) {
-    private val client = SafeNest(apiKey = apiKey)
+    private val client = Tuteliq(apiKey = apiKey)
 
     suspend fun checkMessage(message: String): AnalyzeResult {
         return withContext(Dispatchers.IO) {
@@ -314,16 +314,16 @@ The **grooming** method already accepts a `messages` list and analyzes the full 
 
 ### PII Redaction
 
-Enable `PII_REDACTION_ENABLED=true` on your SafeNest API to automatically strip emails, phone numbers, URLs, social handles, IPs, and other PII from detection summaries and webhook payloads. The original text is still analyzed in full — only stored outputs are scrubbed.
+Enable `PII_REDACTION_ENABLED=true` on your Tuteliq API to automatically strip emails, phone numbers, URLs, social handles, IPs, and other PII from detection summaries and webhook payloads. The original text is still analyzed in full — only stored outputs are scrubbed.
 
 ---
 
 ## Support
 
-- **API Docs**: [api.safenest.dev/docs](https://api.safenest.dev/docs)
+- **API Docs**: [api.tuteliq.ai/docs](https://api.tuteliq.ai/docs)
 - **Discord**: [discord.gg/7kbTeRYRXD](https://discord.gg/7kbTeRYRXD)
-- **Email**: support@safenest.dev
-- **Issues**: [GitHub Issues](https://github.com/SafeNestSDK/kotlin/issues)
+- **Email**: support@tuteliq.ai
+- **Issues**: [GitHub Issues](https://github.com/Tuteliq/kotlin/issues)
 
 ---
 
@@ -333,6 +333,31 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
+## The Mission: Why This Matters
+
+Before you decide to contribute or sponsor, read these numbers. They are not projections. They are not estimates from a pitch deck. They are verified statistics from the University of Edinburgh, UNICEF, NCMEC, and Interpol.
+
+- **302 million** children are victims of online sexual exploitation and abuse every year. That is **10 children every second**. *(Childlight / University of Edinburgh, 2024)*
+- **1 in 8** children globally have been victims of non-consensual sexual imagery in the past year. *(Childlight, 2024)*
+- **370 million** girls and women alive today experienced rape or sexual assault in childhood. An estimated **240–310 million** boys and men experienced the same. *(UNICEF, 2024)*
+- **29.2 million** incidents of suspected child sexual exploitation were reported to NCMEC's CyberTipline in 2024 alone — containing **62.9 million files** (images, videos). *(NCMEC, 2025)*
+- **546,000** reports of online enticement (adults grooming children) in 2024 — a **192% increase** from the year before. *(NCMEC, 2025)*
+- **1,325% increase** in AI-generated child sexual abuse material reports between 2023 and 2024. The technology that should protect children is being weaponized against them. *(NCMEC, 2025)*
+- **100 sextortion reports per day** to NCMEC. Since 2021, at least **36 teenage boys** have taken their own lives because they were victimized by sextortion. *(NCMEC, 2025)*
+- **84%** of reports resolve outside the United States. This is not an American problem. This is a **global emergency**. *(NCMEC, 2025)*
+
+End-to-end encryption is making platforms blind. In 2024, platforms reported **7 million fewer incidents** than the year before — not because abuse stopped, but because they can no longer see it. The tools that catch known images are failing. The systems that rely on human moderators are overwhelmed. The technology to detect behavior — grooming patterns, escalation, manipulation — in real-time text conversations **exists right now**. It is running at [api.tuteliq.ai](https://api.tuteliq.ai).
+
+The question is not whether this technology is possible. The question is whether we build the company to put it everywhere it needs to be.
+
+**Every second we wait, another child is harmed.**
+
+We have the technology. We need the support.
+
+If this mission matters to you, consider [sponsoring our open-source work](https://github.com/sponsors/Tuteliq) so we can keep building the tools that protect children — and keep them free and accessible for everyone.
+
+---
+
 <p align="center">
-  <sub>Built with care for child safety by the <a href="https://safenest.dev">SafeNest</a> team</sub>
+  <sub>Built with care for child safety by the <a href="https://tuteliq.ai">Tuteliq</a> team</sub>
 </p>

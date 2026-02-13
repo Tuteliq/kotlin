@@ -1,1 +1,1 @@
-rootProject.name = "safenest"
+rootProject.name = "tuteliq"

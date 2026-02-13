@@ -1,4 +1,4 @@
-package dev.safenest
+package dev.tuteliq
 
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -13,11 +13,11 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.*
 
 /**
- * SafeNest API client for child safety analysis.
+ * Tuteliq API client for child safety analysis.
  *
  * Example:
  * ```kotlin
- * val client = SafeNest("your-api-key")
+ * val client = Tuteliq("your-api-key")
  * val result = client.detectBullying("Some text to analyze")
  * if (result.isBullying) {
  *     println("Severity: ${result.severity}")
@@ -25,18 +25,18 @@ import kotlinx.serialization.json.*
  * client.close()
  * ```
  *
- * @property apiKey Your SafeNest API key.
+ * @property apiKey Your Tuteliq API key.
  * @property timeout Request timeout in milliseconds.
  * @property maxRetries Number of retry attempts for transient failures.
  * @property retryDelay Initial retry delay in milliseconds.
  * @property baseUrl API base URL.
  */
-class SafeNest(
+class Tuteliq(
     private val apiKey: String,
     private val timeout: Long = 30_000L,
     private val maxRetries: Int = 3,
     private val retryDelay: Long = 1_000L,
-    private val baseUrl: String = "https://api.safenest.dev"
+    private val baseUrl: String = "https://api.tuteliq.ai"
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -418,6 +418,108 @@ class SafeNest(
         return request("GET", "/api/v1/account/export")
     }
 
+    /**
+     * Record user consent (GDPR Article 7).
+     */
+    suspend fun recordConsent(input: RecordConsentInput): ConsentActionResult {
+        val body = buildJsonObject {
+            put("consent_type", input.consentType.name.lowercase())
+            put("version", input.version)
+        }
+        return request("/api/v1/account/consent", body)
+    }
+
+    /**
+     * Get current consent status (GDPR Article 7).
+     */
+    suspend fun getConsentStatus(type: ConsentType? = null): ConsentStatusResult {
+        val query = if (type != null) "?type=${type.name.lowercase()}" else ""
+        return request("GET", "/api/v1/account/consent$query")
+    }
+
+    /**
+     * Withdraw consent (GDPR Article 7.3).
+     */
+    suspend fun withdrawConsent(type: ConsentType): ConsentActionResult {
+        return request("DELETE", "/api/v1/account/consent/${type.name.lowercase()}")
+    }
+
+    /**
+     * Rectify user data (GDPR Article 16 — Right to Rectification).
+     */
+    suspend fun rectifyData(input: RectifyDataInput): RectifyDataResult {
+        val body = buildJsonObject {
+            put("collection", input.collection)
+            put("document_id", input.documentId)
+            put("fields", mapToJsonObject(input.fields))
+        }
+        return requestWithMethod("PATCH", "/api/v1/account/data", body)
+    }
+
+    /**
+     * Get audit logs (GDPR Article 15 — Right of Access).
+     */
+    suspend fun getAuditLogs(action: AuditAction? = null, limit: Int? = null): AuditLogsResult {
+        val params = mutableListOf<String>()
+        if (action != null) params.add("action=${action.name.lowercase()}")
+        if (limit != null) params.add("limit=$limit")
+        val query = if (params.isNotEmpty()) "?${params.joinToString("&")}" else ""
+        return request("GET", "/api/v1/account/audit-logs$query")
+    }
+
+    // =========================================================================
+    // Breach Management (GDPR Article 33/34)
+    // =========================================================================
+
+    /**
+     * Log a new data breach.
+     */
+    suspend fun logBreach(input: LogBreachInput): LogBreachResult {
+        val body = buildJsonObject {
+            put("title", input.title)
+            put("description", input.description)
+            put("severity", input.severity.name.lowercase())
+            putJsonArray("affected_user_ids") {
+                input.affectedUserIds.forEach { add(it) }
+            }
+            putJsonArray("data_categories") {
+                input.dataCategories.forEach { add(it) }
+            }
+            put("reported_by", input.reportedBy)
+        }
+        return request("/api/v1/admin/breach", body)
+    }
+
+    /**
+     * List data breaches.
+     */
+    suspend fun listBreaches(status: BreachStatus? = null, limit: Int? = null): BreachListResult {
+        val params = mutableListOf<String>()
+        if (status != null) params.add("status=${status.name.lowercase()}")
+        if (limit != null) params.add("limit=$limit")
+        val query = if (params.isNotEmpty()) "?${params.joinToString("&")}" else ""
+        return request("GET", "/api/v1/admin/breach$query")
+    }
+
+    /**
+     * Get a single breach by ID.
+     */
+    suspend fun getBreach(id: String): BreachResult {
+        return request("GET", "/api/v1/admin/breach/$id")
+    }
+
+    /**
+     * Update a breach's status.
+     */
+    suspend fun updateBreachStatus(id: String, input: UpdateBreachInput): BreachResult {
+        val body = buildJsonObject {
+            put("status", input.status.name.lowercase())
+            input.notificationStatus?.let { put("notification_status", it.name.lowercase()) }
+            input.notes?.let { put("notes", it) }
+        }
+        return requestWithMethod("PATCH", "/api/v1/admin/breach/$id", body)
+    }
+
     // =========================================================================
     // Private Methods
     // =========================================================================
@@ -450,7 +552,7 @@ class SafeNest(
             }
         }
 
-        throw lastException ?: SafeNestException("Request failed after retries")
+        throw lastException ?: TuteliqException("Request failed after retries")
     }
 
     private suspend inline fun <reified T> performRequest(method: String, path: String, body: JsonObject?): T {
@@ -502,14 +604,15 @@ class SafeNest(
             404 -> NotFoundException(message, details)
             429 -> RateLimitException(message, details)
             in 500..599 -> ServerException(message, status, details)
-            else -> SafeNestException(message, details)
+            else -> TuteliqException(message, details)
         }
     }
 
-    private fun mapToJsonObject(map: Map<String, Any>): JsonObject {
+    private fun mapToJsonObject(map: Map<String, Any?>): JsonObject {
         return buildJsonObject {
             map.forEach { (key, value) ->
                 when (value) {
+                    null -> put(key, JsonNull)
                     is String -> put(key, value)
                     is Number -> put(key, value)
                     is Boolean -> put(key, value)

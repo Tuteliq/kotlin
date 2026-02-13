@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug in the SafeNest Kotlin SDK
+about: Report a bug in the Tuteliq Kotlin SDK
 title: "[Bug] "
 labels: bug
 assignees: ""

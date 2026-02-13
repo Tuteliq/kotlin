@@ -6,7 +6,7 @@ plugins {
     signing
 }
 
-group = "dev.safenest"
+group = "dev.tuteliq"
 version = "1.1.0"
 
 repositories {
@@ -51,9 +51,9 @@ publishing {
             from(components["java"])
 
             pom {
-                name.set("SafeNest SDK")
-                description.set("Official Kotlin SDK for SafeNest - AI-powered child safety API")
-                url.set("https://github.com/SafeNestSDK/kotlin")
+                name.set("Tuteliq SDK")
+                description.set("Official Kotlin SDK for Tuteliq - AI-powered child safety API")
+                url.set("https://github.com/TuteliqSDK/kotlin")
 
                 licenses {
                     license {
@@ -64,16 +64,16 @@ publishing {
 
                 developers {
                     developer {
-                        id.set("safenest")
-                        name.set("SafeNest")
-                        email.set("sales@safenest.dev")
+                        id.set("tuteliq")
+                        name.set("Tuteliq")
+                        email.set("sales@tuteliq.dev")
                     }
                 }
 
                 scm {
-                    connection.set("scm:git:git://github.com/SafeNestSDK/kotlin.git")
-                    developerConnection.set("scm:git:ssh://github.com/SafeNestSDK/kotlin.git")
-                    url.set("https://github.com/SafeNestSDK/kotlin")
+                    connection.set("scm:git:git://github.com/TuteliqSDK/kotlin.git")
+                    developerConnection.set("scm:git:ssh://github.com/TuteliqSDK/kotlin.git")
+                    url.set("https://github.com/TuteliqSDK/kotlin")
                 }
             }
         }
