@@ -1143,14 +1143,31 @@ class Tuteliq(
     private fun mapToJsonObject(map: Map<String, Any?>): JsonObject {
         return buildJsonObject {
             map.forEach { (key, value) ->
-                when (value) {
-                    null -> put(key, JsonNull)
-                    is String -> put(key, value)
-                    is Number -> put(key, value)
-                    is Boolean -> put(key, value)
-                    else -> put(key, value.toString())
+                put(key, toJsonElement(value))
+            }
+        }
+    }
+
+    private fun toJsonElement(value: Any?): JsonElement {
+        return when (value) {
+            null -> JsonNull
+            is Map<*, *> -> {
+                buildJsonObject {
+                    value.forEach { (k, v) ->
+                        put(k.toString(), toJsonElement(v))
+                    }
                 }
             }
+            is List<*> -> {
+                buildJsonArray {
+                    value.forEach { add(toJsonElement(it)) }
+                }
+            }
+            is Boolean -> JsonPrimitive(value)
+            is Number -> JsonPrimitive(value)
+            is String -> JsonPrimitive(value)
+            is JsonElement -> value
+            else -> JsonPrimitive(value.toString())
         }
     }
 }
