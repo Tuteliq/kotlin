@@ -132,6 +132,11 @@ val result = client.detectGrooming(
 if (result.groomingRisk == GroomingRisk.HIGH) {
     println("Flags: ${result.flags}")  // ["secrecy", "isolation"]
 }
+
+// Per-message breakdown (optional, returned on conversation-aware endpoints)
+result.messageAnalysis?.forEach { m ->
+    println("Message ${m.messageIndex}: risk=${m.riskScore}, flags=${m.flags}, summary=${m.summary}")
+}
 ```
 
 ### Unsafe Content Detection

@@ -190,6 +190,7 @@ data class GroomingResult(
     @SerialName("risk_score") val riskScore: Double,
     @SerialName("recommended_action") val recommendedAction: String,
     val language: String? = null,
+    @SerialName("message_analysis") val messageAnalysis: List<MessageAnalysis>? = null,
     @SerialName("language_status") val languageStatus: String? = null,
     @SerialName("external_id") val externalId: String? = null,
     val metadata: JsonObject? = null,
@@ -477,6 +478,17 @@ data class BreachResult(
 // =============================================================================
 
 /**
+ * Per-message analysis from conversation-aware detection.
+ */
+@Serializable
+data class MessageAnalysis(
+    @SerialName("message_index") val messageIndex: Int,
+    @SerialName("risk_score") val riskScore: Double,
+    val flags: List<String>,
+    val summary: String
+)
+
+/**
  * A detection category with tag, label, and confidence.
  */
 @Serializable
@@ -524,6 +536,7 @@ data class DetectionResult(
     @SerialName("language_status") val languageStatus: String,
     val evidence: List<DetectionEvidence>? = null,
     @SerialName("age_calibration") val ageCalibration: AgeCalibration? = null,
+    @SerialName("message_analysis") val messageAnalysis: List<MessageAnalysis>? = null,
     @SerialName("credits_used") val creditsUsed: Int? = null,
     @SerialName("processing_time_ms") val processingTimeMs: Double? = null,
     @SerialName("external_id") val externalId: String? = null,
