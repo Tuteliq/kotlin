@@ -1,0 +1,30 @@
+# Tuteliq Kotlin SDK
+
+> Official Kotlin SDK for Tuteliq — AI-powered child safety API for Android and JVM applications.
+
+## What is this?
+A Kotlin library for the Tuteliq child safety API. Detect bullying, grooming, self-harm, substance promotion, and other harmful content. Works with Android (API 26+) and JVM (11+) applications.
+
+## Install
+// build.gradle.kts
+dependencies {
+    implementation("ai.tuteliq:tuteliq-kotlin:1.0.0")
+}
+
+## Quick Start
+import ai.tuteliq.Tuteliq
+val client = Tuteliq(apiKey = System.getenv("TUTELIQ_API_KEY"))
+val result = client.detectUnsafe(text = "content to check", ageGroup = "13-15")
+
+## Key Features
+- Kotlin coroutines support
+- Android and JVM compatible
+- All 20+ Tuteliq API endpoints
+- 16+ detection categories (KOSA compliant)
+- Age group calibration
+- Ktor-based HTTP client
+
+## Links
+- Website: https://tuteliq.ai
+- Documentation: https://docs.tuteliq.ai
+- GitHub: https://github.com/Tuteliq/kotlin
