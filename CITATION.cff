@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+title: Tuteliq Kotlin SDK
+message: "If you use this software, please cite it using this metadata."
+type: software
+authors:
+  - name: Tuteliq
+    website: https://tuteliq.ai
+repository-code: https://github.com/Tuteliq/kotlin
+url: https://tuteliq.ai
+abstract: >-
+  Official Kotlin SDK for Tuteliq — AI-powered child safety API for Android and JVM applications
+keywords:
+  - child safety
+  - Kotlin
+  - Android
+  - content moderation
+  - KOSA
+  - SDK
+  - JVM
+  - coroutines
+  - online safety
+  - age verification
+  - identity verification
+license: MIT

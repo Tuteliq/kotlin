@@ -211,6 +211,41 @@ println("Risk: ${report.riskLevel}")
 println("Next Steps: ${report.recommendedNextSteps}")
 ```
 
+### Age Verification (Beta)
+
+> **Pro tier ($99/mo)+ required** — 5 credits per request — `POST /v1/verification/age`
+
+```kotlin
+val ageResult = tuteliq.verifyAge(
+    document = File("id-front.jpg"),
+    selfie = File("selfie.jpg"),
+    method = VerificationMethod.COMBINED // DOCUMENT | BIOMETRIC | COMBINED
+)
+
+println(ageResult.verified)       // true
+println(ageResult.estimatedAge)   // 15
+println(ageResult.ageRange)       // "13-15"
+println(ageResult.isMinor)        // true
+println(ageResult.confidence)     // 0.97
+```
+
+### Identity Verification (Beta)
+
+> **Business tier ($349/mo)+ required** — 10 credits per request — `POST /v1/verification/identity`
+
+```kotlin
+val identityResult = tuteliq.verifyIdentity(
+    document = File("id-front.jpg"),
+    selfie = File("selfie.jpg")
+)
+
+println(identityResult.verified)               // true
+println(identityResult.matchScore)             // 0.98
+println(identityResult.livenessPassed)         // true
+println(identityResult.documentAuthenticated)  // true
+println(identityResult.isMinor)               // false
+```
+
 ### Voice Streaming
 
 Real-time voice analysis over WebSocket:
@@ -260,6 +295,8 @@ println("Credits used: ${result.creditsUsed}")
 | `generateReport()` | 3 |
 | `analyzeVoice()` | 5 |
 | `analyzeImage()` | 3 |
+| `verifyAge()` | 5 |
+| `verifyIdentity()` | 10 |
 
 ---
 
