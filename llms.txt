@@ -26,6 +26,9 @@ val result = client.detectUnsafe(text = "content to check", ageGroup = "13-15")
 - Age Verification (Beta) — POST /v1/verification/age — 5 credits — Pro tier ($99/mo)+
 - Identity Verification (Beta) — POST /v1/verification/identity — 10 credits — Business tier ($349/mo)+
 
+## Supported Languages
+27 languages: English (stable), Spanish, Portuguese, Ukrainian, Swedish, Norwegian, Danish, Finnish, German, French, Dutch, Polish, Italian, Turkish, Romanian, Greek, Czech, Hungarian, Bulgarian, Croatian, Slovak, Lithuanian, Latvian, Estonian, Slovenian, Maltese, Irish (beta). Auto-detected, no configuration needed.
+
 ## Links
 - Website: https://tuteliq.ai
 - Documentation: https://docs.tuteliq.ai
