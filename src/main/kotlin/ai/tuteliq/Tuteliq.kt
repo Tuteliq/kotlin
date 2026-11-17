@@ -1028,7 +1028,7 @@ class Tuteliq internal constructor(
      * @return VerificationSessionResult with current status.
      */
     suspend fun getVerificationSession(id: String): VerificationSessionResult {
-        return request("GET", "/api/v1/verify/session/$id")
+        return request("GET", "/api/v1/verify/session/${id.encodeURLPathPart()}")
     }
 
     /**
@@ -1038,7 +1038,7 @@ class Tuteliq internal constructor(
      * @return CancelVerificationSessionResult; the session then reports [VerificationSessionStatus.EXPIRED].
      */
     suspend fun cancelVerificationSession(id: String): CancelVerificationSessionResult {
-        return request("DELETE", "/api/v1/verify/session/$id")
+        return request("DELETE", "/api/v1/verify/session/${id.encodeURLPathPart()}")
     }
 
     /**
@@ -1048,7 +1048,7 @@ class Tuteliq internal constructor(
      * @return VerificationRetrieveResult with verification details.
      */
     suspend fun getAgeVerification(id: String): VerificationRetrieveResult {
-        return request("GET", "/api/v1/verify/age/$id")
+        return request("GET", "/api/v1/verify/age/${id.encodeURLPathPart()}")
     }
 
     /**
@@ -1058,7 +1058,7 @@ class Tuteliq internal constructor(
      * @return IdentityRetrieveResult with verification details.
      */
     suspend fun getIdentityVerification(id: String): IdentityRetrieveResult {
-        return request("GET", "/api/v1/verify/identity/$id")
+        return request("GET", "/api/v1/verify/identity/${id.encodeURLPathPart()}")
     }
 
     /**
@@ -1280,7 +1280,7 @@ class Tuteliq internal constructor(
             input.active?.let { put("is_active", it) }
             input.headers?.let { put("headers", mapToJsonObject(it)) }
         }
-        return requestWithMethod("PUT", "/api/v1/webhooks/$webhookId", body)
+        return requestWithMethod("PUT", "/api/v1/webhooks/${webhookId.encodeURLPathPart()}", body)
     }
 
     /**
@@ -1290,7 +1290,7 @@ class Tuteliq internal constructor(
      * @return DeleteWebhookResult confirmation.
      */
     suspend fun deleteWebhook(webhookId: String): DeleteWebhookResult {
-        return request("DELETE", "/api/v1/webhooks/$webhookId")
+        return request("DELETE", "/api/v1/webhooks/${webhookId.encodeURLPathPart()}")
     }
 
     /**
@@ -1310,7 +1310,7 @@ class Tuteliq internal constructor(
      * @return RegenerateSecretResult with the new secret.
      */
     suspend fun regenerateWebhookSecret(webhookId: String): RegenerateSecretResult {
-        return requestWithMethod("POST", "/api/v1/webhooks/$webhookId/regenerate-secret", null)
+        return requestWithMethod("POST", "/api/v1/webhooks/${webhookId.encodeURLPathPart()}/regenerate-secret", null)
     }
 
     // =========================================================================
@@ -1538,7 +1538,7 @@ class Tuteliq internal constructor(
      */
     private fun FormBuilder.appendFile(file: ByteArray, filename: String, contentType: String?) {
         append("file", file, Headers.build {
-            append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
+            append(HttpHeaders.ContentDisposition, "filename=\"${escapeFilename(filename)}\"")
             append(HttpHeaders.ContentType, contentType ?: mimeTypeForFilename(filename) ?: "application/octet-stream")
         })
     }
@@ -1609,6 +1609,10 @@ private val UPLOAD_MIME_TYPES = mapOf(
     "mp4" to "video/mp4", "webm" to "video/webm", "mov" to "video/quicktime", "avi" to "video/x-msvideo",
     "pdf" to "application/pdf"
 )
+
+/** Filename safe inside a quoted header value: line breaks dropped, backslash and quote escaped. */
+internal fun escapeFilename(filename: String): String =
+    filename.replace("\r", "").replace("\n", "").replace("\\", "\\\\").replace("\"", "\\\"")
 
 /** MIME type for an upload, from its filename's extension; null when the extension is unknown. */
 internal fun mimeTypeForFilename(filename: String): String? =

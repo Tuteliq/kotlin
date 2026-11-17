@@ -429,4 +429,40 @@ class ApiContractTest {
         assertTrue(runCatching { RedactInput() }.isFailure)
         assertTrue(runCatching { RedactInput(text = "a", messages = listOf("b")) }.isFailure)
     }
+
+    // =========================================================================
+    // Path ids and upload filenames
+    // =========================================================================
+
+    @Test
+    fun `ids are encoded in every path`() = runTest {
+        val id = "a/b c"
+        val encoded = "a%2Fb%20c"
+        val stub = Stub("""{"ok":true}""")
+        val client = stub.client()
+        runCatching { client.getVerificationSession(id) }
+        runCatching { client.cancelVerificationSession(id) }
+        runCatching { client.getAgeVerification(id) }
+        runCatching { client.getIdentityVerification(id) }
+        runCatching { client.updateWebhook(id, UpdateWebhookInput(name = "n")) }
+        runCatching { client.deleteWebhook(id) }
+        runCatching { client.regenerateWebhookSecret(id) }
+        assertEquals(7, stub.requests.size)
+        stub.requests.forEach { assertTrue(it.url.encodedPath.endsWith(encoded) || it.url.encodedPath.contains("$encoded/"), it.url.encodedPath) }
+    }
+
+    @Test
+    fun `upload filename is escaped in the part header`() = runTest {
+        val stub = Stub(imageResponse)
+        stub.client().analyzeImage(byteArrayOf(1, 2, 3), "a\"b\r\nX: y.png")
+        val body = stub.bodies.last()
+        assertTrue(body.contains("filename=\"a\\\"bX: y.png\""), body)
+        assertFalse(body.contains("\nX: y.png"), body)
+    }
+
+    @Test
+    fun `ID_CARD wire value decodes to NATIONAL_ID`() {
+        val decoded = Json.decodeFromString<DocumentType>("\"national_id\"")
+        assertEquals(DocumentType.NATIONAL_ID, decoded)
+    }
 }
