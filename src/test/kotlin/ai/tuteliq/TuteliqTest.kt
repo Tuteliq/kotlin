@@ -212,26 +212,28 @@ class TuteliqTest {
 
     @Test
     fun `DocumentType enum has correct values`() {
-        assertEquals("passport", DocumentType.PASSPORT.name.lowercase())
-        assertEquals("id_card", DocumentType.ID_CARD.name.lowercase())
-        assertEquals("drivers_license", DocumentType.DRIVERS_LICENSE.name.lowercase())
+        assertEquals("passport", DocumentType.PASSPORT.value)
+        assertEquals("national_id", DocumentType.NATIONAL_ID.value)
+        @Suppress("DEPRECATION")
+        assertEquals("national_id", DocumentType.ID_CARD.value)
+        assertEquals("drivers_license", DocumentType.DRIVERS_LICENSE.value)
     }
 
     @Test
     fun `VerificationStatus enum has correct values`() {
-        assertEquals("verified", VerificationStatus.VERIFIED.name.lowercase())
-        assertEquals("failed", VerificationStatus.FAILED.name.lowercase())
-        assertEquals("needs_review", VerificationStatus.NEEDS_REVIEW.name.lowercase())
+        assertEquals("verified", VerificationStatus.VERIFIED.value)
+        assertEquals("failed", VerificationStatus.FAILED.value)
+        assertEquals("needs_review", VerificationStatus.NEEDS_REVIEW.value)
     }
 
     @Test
     fun `VerificationSessionStatus enum has correct values`() {
-        assertEquals("pending", VerificationSessionStatus.PENDING.name.lowercase())
-        assertEquals("in_progress", VerificationSessionStatus.IN_PROGRESS.name.lowercase())
-        assertEquals("completed", VerificationSessionStatus.COMPLETED.name.lowercase())
-        assertEquals("failed", VerificationSessionStatus.FAILED.name.lowercase())
-        assertEquals("expired", VerificationSessionStatus.EXPIRED.name.lowercase())
-        assertEquals("cancelled", VerificationSessionStatus.CANCELLED.name.lowercase())
+        assertEquals("pending", VerificationSessionStatus.PENDING.value)
+        assertEquals("in_progress", VerificationSessionStatus.IN_PROGRESS.value)
+        assertEquals("document_required", VerificationSessionStatus.DOCUMENT_REQUIRED.value)
+        assertEquals("completed", VerificationSessionStatus.COMPLETED.value)
+        assertEquals("failed", VerificationSessionStatus.FAILED.value)
+        assertEquals("expired", VerificationSessionStatus.EXPIRED.value)
     }
 
     // =========================================================================
@@ -254,7 +256,7 @@ class TuteliqTest {
             {
                 "session_id": "vs_abc123",
                 "mobile_url": "https://verify.tuteliq.ai/session/vs_abc123",
-                "expires_at": "2026-03-05T12:00:00Z",
+                "expires_at": 1772712000000,
                 "mode": "age"
             }
         """.trimIndent()
@@ -263,7 +265,7 @@ class TuteliqTest {
 
         assertEquals("vs_abc123", session.sessionId)
         assertEquals("https://verify.tuteliq.ai/session/vs_abc123", session.url)
-        assertEquals("2026-03-05T12:00:00Z", session.expiresAt)
+        assertEquals(1772712000000L, session.expiresAt)
         assertEquals(VerificationMode.AGE, session.mode)
     }
 
@@ -323,8 +325,8 @@ class TuteliqTest {
             {
                 "session_id": "vs_abc123",
                 "status": "completed",
-                "created_at": "2026-03-05T10:00:00Z",
-                "expires_at": "2026-03-05T12:00:00Z"
+                "created_at": 1772704800000,
+                "expires_at": 1772712000000
             }
         """.trimIndent()
         val json = Json { ignoreUnknownKeys = true }
@@ -332,5 +334,6 @@ class TuteliqTest {
 
         assertEquals("vs_abc123", result.sessionId)
         assertEquals(VerificationSessionStatus.COMPLETED, result.status)
+        assertEquals(1772712000000L, result.expiresAt)
     }
 }

@@ -2,6 +2,7 @@ package ai.tuteliq
 
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.engine.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -33,19 +34,28 @@ import kotlinx.serialization.json.*
  * @property retryDelay Initial retry delay in milliseconds.
  * @property baseUrl API base URL.
  */
-class Tuteliq(
+class Tuteliq internal constructor(
     private val apiKey: String,
-    private val timeout: Long = 30_000L,
-    private val maxRetries: Int = 3,
-    private val retryDelay: Long = 1_000L,
-    private val baseUrl: String = "https://api.tuteliq.ai"
+    private val timeout: Long,
+    private val maxRetries: Int,
+    private val retryDelay: Long,
+    private val baseUrl: String,
+    engine: HttpClientEngine?
 ) {
+    constructor(
+        apiKey: String,
+        timeout: Long = 30_000L,
+        maxRetries: Int = 3,
+        retryDelay: Long = 1_000L,
+        baseUrl: String = "https://api.tuteliq.ai"
+    ) : this(apiKey, timeout, maxRetries, retryDelay, baseUrl, null)
+
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
     }
 
-    private val client = HttpClient(CIO) {
+    private val clientConfig: HttpClientConfig<*>.() -> Unit = {
         install(ContentNegotiation) {
             json(json)
         }
@@ -58,6 +68,8 @@ class Tuteliq(
             contentType(ContentType.Application.Json)
         }
     }
+
+    private val client = if (engine != null) HttpClient(engine, clientConfig) else HttpClient(CIO, clientConfig)
 
     /** Current usage statistics (updated after each request). */
     var usage: Usage? = null
@@ -562,6 +574,7 @@ class Tuteliq(
      * @param language Language of the audio.
      * @param platform Platform identifier.
      * @param childAge Age of the child.
+     * @param contentType MIME type of the audio. Defaults to the type for the filename's extension.
      * @return VoiceAnalysisResult with transcription and safety analysis.
      */
     suspend fun analyzeVoice(
@@ -576,11 +589,10 @@ class Tuteliq(
         language: String? = null,
         platform: String? = null,
         childAge: Int? = null,
+        contentType: String? = null,
     ): VoiceAnalysisResult {
         val data = multipartRequest("/api/v1/safety/voice") {
-            append("file", file, Headers.build {
-                append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
-            })
+            appendFile(file, filename, contentType)
             append("analysis_type", analysisType)
             append("platform", resolvePlatform(platform))
             fileId?.let { append("file_id", it) }
@@ -610,6 +622,7 @@ class Tuteliq(
      * @param metadata Custom metadata.
      * @param ageGroup Age group context.
      * @param platform Platform identifier.
+     * @param contentType MIME type of the image. Defaults to the type for the filename's extension.
      * @return ImageAnalysisResult with vision and safety analysis.
      */
     suspend fun analyzeImage(
@@ -622,11 +635,10 @@ class Tuteliq(
         metadata: Map<String, Any>? = null,
         ageGroup: String? = null,
         platform: String? = null,
+        contentType: String? = null,
     ): ImageAnalysisResult {
         val data = multipartRequest("/api/v1/safety/image") {
-            append("file", file, Headers.build {
-                append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
-            })
+            appendFile(file, filename, contentType)
             append("analysis_type", analysisType)
             append("platform", resolvePlatform(platform))
             fileId?.let { append("file_id", it) }
@@ -774,6 +786,118 @@ class Tuteliq(
         externalId: String? = null, customerId: String? = null, metadata: Map<String, Any?>? = null
     ): DetectionResult = detectRadicalisation(DetectionInput(content, context, includeEvidence, externalId, customerId, metadata))
 
+    /**
+     * Detect distress signals.
+     */
+    suspend fun detectDistressSignals(input: DetectionInput): DetectionResult =
+        request("/api/v1/safety/distress-signals", buildDetectionBody(input))
+
+    /**
+     * Detect distress signals.
+     */
+    suspend fun detectDistressSignals(
+        content: String, context: AnalysisContext? = null, includeEvidence: Boolean = false,
+        externalId: String? = null, customerId: String? = null, metadata: Map<String, Any?>? = null
+    ): DetectionResult = detectDistressSignals(DetectionInput(content, context, includeEvidence, externalId, customerId, metadata))
+
+    /**
+     * Detect technology-facilitated gender-based violence.
+     */
+    suspend fun detectTfgbv(input: DetectionInput): DetectionResult =
+        request("/api/v1/safety/tfgbv", buildDetectionBody(input))
+
+    /**
+     * Detect technology-facilitated gender-based violence.
+     */
+    suspend fun detectTfgbv(
+        content: String, context: AnalysisContext? = null, includeEvidence: Boolean = false,
+        externalId: String? = null, customerId: String? = null, metadata: Map<String, Any?>? = null
+    ): DetectionResult = detectTfgbv(DetectionInput(content, context, includeEvidence, externalId, customerId, metadata))
+
+    // =========================================================================
+    // Nickname
+    // =========================================================================
+
+    /**
+     * Review a display name. Returns a signal about the name, not a verdict on the person.
+     *
+     * @param input DetectNicknameInput with the name and optional context.
+     * @return NicknameResult with the signal and a recommendation.
+     */
+    suspend fun detectNickname(input: DetectNicknameInput): NicknameResult {
+        val body = buildJsonObject {
+            put("name", input.name)
+            input.strictness?.let { put("strictness", it.value) }
+            val context = buildJsonObject {
+                input.language?.let { put("language", it) }
+                input.ageGroup?.let { put("age_group", it) }
+                input.conversationType?.let { put("conversation_type", it) }
+                input.platformReserved?.let { putJsonArray("platform_reserved") { it.forEach { n -> add(n) } } }
+            }
+            if (context.isNotEmpty()) put("context", context)
+        }
+        return request("/api/v1/safety/nickname", body)
+    }
+
+    // =========================================================================
+    // Synthetic Content
+    // =========================================================================
+
+    /**
+     * Detect AI-generated or synthetic text.
+     */
+    suspend fun detectSyntheticText(input: DetectSyntheticTextInput): SyntheticContentResult {
+        val body = buildJsonObject {
+            put("text", input.content)
+            putJsonObject("context") {
+                input.context?.let { ctx ->
+                    ctx.language?.let { put("language", it) }
+                    ctx.ageGroup?.let { put("age_group", it) }
+                    ctx.relationship?.let { put("relationship", it) }
+                }
+                put("platform", resolvePlatform(input.context?.platform))
+            }
+            input.supportThreshold?.let { putJsonObject("options") { put("support_threshold", it) } }
+            input.externalId?.let { put("external_id", it) }
+            input.customerId?.let { put("customer_id", it) }
+            input.metadata?.let { put("metadata", mapToJsonObject(it)) }
+        }
+        return request("/api/v1/safety/synthetic-content", body)
+    }
+
+    /**
+     * Detect an AI-generated or manipulated image.
+     */
+    suspend fun detectSyntheticImage(input: DetectSyntheticMediaInput): SyntheticContentResult =
+        syntheticMediaRequest("/api/v1/safety/synthetic-content/image", input)
+
+    /**
+     * Detect synthetic or cloned audio.
+     */
+    suspend fun detectSyntheticAudio(input: DetectSyntheticMediaInput): SyntheticContentResult =
+        syntheticMediaRequest("/api/v1/safety/synthetic-content/audio", input)
+
+    /**
+     * Detect a synthetic or manipulated video.
+     */
+    suspend fun detectSyntheticVideo(input: DetectSyntheticMediaInput): SyntheticContentResult =
+        syntheticMediaRequest("/api/v1/safety/synthetic-content/video", input)
+
+    private suspend fun syntheticMediaRequest(path: String, input: DetectSyntheticMediaInput): SyntheticContentResult {
+        val data = multipartRequest(path) {
+            appendFile(input.file, input.filename, input.contentType)
+            append("platform", resolvePlatform(input.platform))
+            input.maxFrames?.let { append("max_frames", it.toString()) }
+            input.ageGroup?.let { append("age_group", it) }
+            input.language?.let { append("language", it) }
+            input.fileId?.let { append("file_id", it) }
+            input.externalId?.let { append("external_id", it) }
+            input.customerId?.let { append("customer_id", it) }
+            input.metadata?.let { append("metadata", json.encodeToString(mapToJsonObject(it))) }
+        }
+        return json.decodeFromJsonElement(data)
+    }
+
     // =========================================================================
     // Multi-Endpoint Analysis
     // =========================================================================
@@ -821,6 +945,7 @@ class Tuteliq(
      * @param metadata Custom metadata.
      * @param ageGroup Age group context.
      * @param platform Platform identifier.
+     * @param contentType MIME type of the video. Defaults to the type for the filename's extension.
      * @return VideoAnalysisResult with safety findings.
      */
     suspend fun analyzeVideo(
@@ -831,18 +956,45 @@ class Tuteliq(
         customerId: String? = null,
         metadata: Map<String, Any?>? = null,
         ageGroup: String? = null,
-        platform: String? = null
+        platform: String? = null,
+        contentType: String? = null
     ): VideoAnalysisResult {
         val data = multipartRequest("/api/v1/safety/video") {
-            append("file", file, Headers.build {
-                append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
-            })
+            appendFile(file, filename, contentType)
             append("platform", resolvePlatform(platform))
             fileId?.let { append("file_id", it) }
             externalId?.let { append("external_id", it) }
             customerId?.let { append("customer_id", it) }
             metadata?.let { append("metadata", json.encodeToString(mapToJsonObject(it))) }
             ageGroup?.let { append("age_group", it) }
+        }
+        return json.decodeFromJsonElement(data)
+    }
+
+    // =========================================================================
+    // Document Analysis
+    // =========================================================================
+
+    /**
+     * Analyze a PDF, or a single png, jpeg or webp image, across several detectors.
+     * Each page is analyzed on its own; the result has per-page findings and an overall assessment.
+     *
+     * @param input AnalyzeDocumentInput with the file and options.
+     * @return DocumentAnalysisResult with per-page and overall findings.
+     */
+    suspend fun analyzeDocument(input: AnalyzeDocumentInput): DocumentAnalysisResult {
+        val data = multipartRequest("/api/v1/safety/document") {
+            appendFile(input.file, input.filename, input.contentType)
+            append("platform", resolvePlatform(input.platform))
+            input.endpoints?.let { append("endpoints", json.encodeToString(it)) }
+            input.fileId?.let { append("file_id", it) }
+            input.ageGroup?.let { append("age_group", it) }
+            input.language?.let { append("language", it) }
+            input.supportThreshold?.let { append("support_threshold", it) }
+            if (input.splitBySender) append("split_by_sender", "true")
+            input.externalId?.let { append("external_id", it) }
+            input.customerId?.let { append("customer_id", it) }
+            input.metadata?.let { append("metadata", json.encodeToString(mapToJsonObject(it))) }
         }
         return json.decodeFromJsonElement(data)
     }
@@ -860,9 +1012,13 @@ class Tuteliq(
     suspend fun createVerificationSession(input: CreateVerificationSessionInput): VerificationSession {
         val body = buildJsonObject {
             put("mode", input.mode.name.lowercase())
-            input.documentType?.let { put("document_type", it.name.lowercase()) }
+            input.documentType?.let { put("document_type", it.value) }
+            input.chipPolicy?.let { put("chip_policy", it.value) }
+            input.autoCapture?.let { put("auto_capture", it) }
         }
-        return request("/api/v1/verify/session", body)
+        // One attempt only: each session reserves a verification, so a retry after a
+        // lost response could create and reserve a second one.
+        return performRequest("POST", "/api/v1/verify/session", body)
     }
 
     /**
@@ -872,17 +1028,17 @@ class Tuteliq(
      * @return VerificationSessionResult with current status.
      */
     suspend fun getVerificationSession(id: String): VerificationSessionResult {
-        return request("GET", "/api/v1/verify/session/$id")
+        return request("GET", "/api/v1/verify/session/${id.encodeURLPathPart()}")
     }
 
     /**
      * Cancel a verification session.
      *
      * @param id The session ID to cancel.
-     * @return CancelVerificationSessionResult with confirmation message.
+     * @return CancelVerificationSessionResult; the session then reports [VerificationSessionStatus.EXPIRED].
      */
     suspend fun cancelVerificationSession(id: String): CancelVerificationSessionResult {
-        return request("DELETE", "/api/v1/verify/session/$id")
+        return request("DELETE", "/api/v1/verify/session/${id.encodeURLPathPart()}")
     }
 
     /**
@@ -892,7 +1048,7 @@ class Tuteliq(
      * @return VerificationRetrieveResult with verification details.
      */
     suspend fun getAgeVerification(id: String): VerificationRetrieveResult {
-        return request("GET", "/api/v1/verify/age/$id")
+        return request("GET", "/api/v1/verify/age/${id.encodeURLPathPart()}")
     }
 
     /**
@@ -902,7 +1058,181 @@ class Tuteliq(
      * @return IdentityRetrieveResult with verification details.
      */
     suspend fun getIdentityVerification(id: String): IdentityRetrieveResult {
-        return request("GET", "/api/v1/verify/identity/$id")
+        return request("GET", "/api/v1/verify/identity/${id.encodeURLPathPart()}")
+    }
+
+    /**
+     * Retrieve any past verification result by ID.
+     *
+     * @param id The verification ID.
+     * @return VerificationRecord with the decision and its signals. No personal data is returned.
+     */
+    suspend fun getVerification(id: String): VerificationRecord {
+        return request("GET", "/api/v1/verify/${id.encodeURLPathPart()}")
+    }
+
+    /**
+     * Get the age verification configuration that applies to a market.
+     *
+     * @param country ISO 3166-1 alpha-2 country code, for example "DE".
+     * @param region Region or state code, for example "CA".
+     * @return VerificationConfig with the check and age threshold.
+     */
+    suspend fun getVerificationConfig(country: String? = null, region: String? = null): VerificationConfig {
+        return request("GET", "/api/v1/verify/age/config${query("country" to country, "region" to region)}")
+    }
+
+    /**
+     * Run face match, age, forensic and synthetic checks on an image.
+     *
+     * @param input VerifyImageMatchInput with the image and an optional reference face.
+     * @return VerifyImageMatchResult with a section per check that ran.
+     */
+    suspend fun verifyImageMatch(input: VerifyImageMatchInput): VerifyImageMatchResult {
+        val encoder = java.util.Base64.getEncoder()
+        val body = buildJsonObject {
+            put("image", encoder.encodeToString(input.image))
+            input.referenceImage?.let { put("reference_image", encoder.encodeToString(it)) }
+            input.checks?.let { putJsonArray("checks") { it.forEach { c -> add(c.value) } } }
+            input.externalId?.let { put("external_id", it) }
+            input.customerId?.let { put("customer_id", it) }
+            input.metadata?.let { put("metadata", mapToJsonObject(it)) }
+        }
+        return request("/api/v1/verify-image-match", body)
+    }
+
+    // =========================================================================
+    // Incidents
+    // =========================================================================
+
+    /**
+     * List incidents, newest first, one page at a time.
+     *
+     * @param input Optional filters and paging.
+     * @return IncidentListResult; pass its nextCursor to get the next page.
+     */
+    suspend fun listIncidents(input: ListIncidentsInput = ListIncidentsInput()): IncidentListResult {
+        val q = query(
+            "category" to input.category,
+            "severity" to input.severity,
+            "status" to input.status,
+            "source" to input.source,
+            "from" to input.from,
+            "to" to input.to,
+            "platform" to input.platform,
+            "external_id" to input.externalId,
+            "customer_id" to input.customerId,
+            "limit" to input.limit,
+            "cursor" to input.cursor,
+            "include_summary" to (if (input.includeSummary) "true" else null)
+        )
+        return request("GET", "/api/v1/incidents$q")
+    }
+
+    /**
+     * Get one incident in full.
+     */
+    suspend fun getIncident(incidentId: String): IncidentDetail {
+        return request("GET", "/api/v1/incidents/${incidentId.encodeURLPathPart()}")
+    }
+
+    /**
+     * Get incident counts over a window.
+     *
+     * @param from Start of the window, ISO 8601.
+     * @param to End of the window, ISO 8601.
+     */
+    suspend fun getIncidentsOverview(from: String? = null, to: String? = null): IncidentsOverview {
+        return request("GET", "/api/v1/incidents/overview${query("from" to from, "to" to to)}")
+    }
+
+    /**
+     * Get incident counts over time.
+     *
+     * @param bucket Bucket size. API default: day.
+     * @param from Start of the window, ISO 8601.
+     * @param to End of the window, ISO 8601.
+     */
+    suspend fun getIncidentTrends(
+        bucket: IncidentTrendBucket? = null,
+        from: String? = null,
+        to: String? = null
+    ): IncidentTrends {
+        return request("GET", "/api/v1/incidents/trends${query("bucket" to bucket?.value, "from" to from, "to" to to)}")
+    }
+
+    /**
+     * Record a moderator review of an incident.
+     */
+    suspend fun reviewIncident(incidentId: String, input: ReviewIncidentInput): ReviewIncidentResult {
+        val body = buildReviewBody(
+            input.action, input.reasonCode, input.moderatorExternalId, input.reasonComment,
+            input.newRiskLevel, input.newRiskCategory, input.retentionClass
+        )
+        return request("/api/v1/incidents/${incidentId.encodeURLPathPart()}/review", body)
+    }
+
+    /**
+     * Apply one moderator review to up to 100 incidents.
+     */
+    suspend fun batchReviewIncidents(input: BatchReviewIncidentsInput): BatchReviewIncidentsResult {
+        require(input.incidentIds.isNotEmpty()) { "incidentIds must not be empty" }
+        require(input.incidentIds.size <= 100) { "At most 100 incidents per call" }
+        val review = buildReviewBody(
+            input.action, input.reasonCode, input.moderatorExternalId, input.reasonComment,
+            input.newRiskLevel, input.newRiskCategory, input.retentionClass
+        )
+        val body = buildJsonObject {
+            putJsonArray("incident_ids") { input.incidentIds.forEach { add(it) } }
+            review.forEach { (key, value) -> put(key, value) }
+        }
+        return request("/api/v1/incidents/batch-review", body)
+    }
+
+    private fun buildReviewBody(
+        action: ModeratorAction,
+        reasonCode: ModeratorReasonCode,
+        moderatorExternalId: String,
+        reasonComment: String?,
+        newRiskLevel: String?,
+        newRiskCategory: String?,
+        retentionClass: RetentionClass?
+    ): JsonObject {
+        require(moderatorExternalId.isNotBlank()) { "moderatorExternalId is required" }
+        require(action != ModeratorAction.RECLASSIFY || newRiskCategory != null) {
+            "RECLASSIFY requires newRiskCategory"
+        }
+        return buildJsonObject {
+            put("action", action.value)
+            put("reason_code", reasonCode.value)
+            put("moderator_external_id", moderatorExternalId)
+            reasonComment?.let { put("reason_comment", it) }
+            newRiskLevel?.let { put("new_risk_level", it) }
+            newRiskCategory?.let { put("new_risk_category", it) }
+            retentionClass?.let { put("retention_class", it.value) }
+        }
+    }
+
+    // =========================================================================
+    // Privacy
+    // =========================================================================
+
+    /**
+     * Remove personal data from a text, or from every message of one conversation
+     * with consistent placeholders. Nothing is stored.
+     *
+     * @param input RedactInput with text or messages.
+     * @return RedactResult with the redacted text and counts per type.
+     */
+    suspend fun redact(input: RedactInput): RedactResult {
+        val body = buildJsonObject {
+            input.text?.let { put("text", it) }
+            input.messages?.let { putJsonArray("messages") { it.forEach { m -> add(m) } } }
+            input.language?.let { put("language", it) }
+            input.mode?.let { put("mode", it.value) }
+            input.strictAnonymisation?.let { put("strict_anonymisation", it) }
+        }
+        return request("/api/v1/privacy/redact", body)
     }
 
     // =========================================================================
@@ -922,14 +1252,15 @@ class Tuteliq(
     /**
      * Create a new webhook.
      *
-     * @param input CreateWebhookInput with URL, events, and active status.
-     * @return CreateWebhookResult with the created webhook.
+     * @param input CreateWebhookInput with name, URL and events.
+     * @return CreateWebhookResult with the created webhook and its signing secret.
      */
     suspend fun createWebhook(input: CreateWebhookInput): CreateWebhookResult {
         val body = buildJsonObject {
+            put("name", input.name)
             put("url", input.url)
             putJsonArray("events") { input.events.forEach { add(it) } }
-            put("active", input.active)
+            input.headers?.let { put("headers", mapToJsonObject(it)) }
         }
         return request("/api/v1/webhooks", body)
     }
@@ -943,11 +1274,13 @@ class Tuteliq(
      */
     suspend fun updateWebhook(webhookId: String, input: UpdateWebhookInput): UpdateWebhookResult {
         val body = buildJsonObject {
+            input.name?.let { put("name", it) }
             input.url?.let { put("url", it) }
             input.events?.let { putJsonArray("events") { it.forEach { e -> add(e) } } }
-            input.active?.let { put("active", it) }
+            input.active?.let { put("is_active", it) }
+            input.headers?.let { put("headers", mapToJsonObject(it)) }
         }
-        return requestWithMethod("PATCH", "/api/v1/webhooks/$webhookId", body)
+        return requestWithMethod("PUT", "/api/v1/webhooks/${webhookId.encodeURLPathPart()}", body)
     }
 
     /**
@@ -957,7 +1290,7 @@ class Tuteliq(
      * @return DeleteWebhookResult confirmation.
      */
     suspend fun deleteWebhook(webhookId: String): DeleteWebhookResult {
-        return request("DELETE", "/api/v1/webhooks/$webhookId")
+        return request("DELETE", "/api/v1/webhooks/${webhookId.encodeURLPathPart()}")
     }
 
     /**
@@ -967,7 +1300,7 @@ class Tuteliq(
      * @return TestWebhookResult with delivery status.
      */
     suspend fun testWebhook(webhookId: String): TestWebhookResult {
-        return requestWithMethod("POST", "/api/v1/webhooks/$webhookId/test", null)
+        return request("/api/v1/webhooks/test", buildJsonObject { put("webhook_id", webhookId) })
     }
 
     /**
@@ -977,7 +1310,7 @@ class Tuteliq(
      * @return RegenerateSecretResult with the new secret.
      */
     suspend fun regenerateWebhookSecret(webhookId: String): RegenerateSecretResult {
-        return requestWithMethod("POST", "/api/v1/webhooks/$webhookId/regenerate-secret", null)
+        return requestWithMethod("POST", "/api/v1/webhooks/${webhookId.encodeURLPathPart()}/regenerate-secret", null)
     }
 
     // =========================================================================
@@ -1035,6 +1368,25 @@ class Tuteliq(
      */
     suspend fun getUsageMonthly(): UsageMonthlyResult {
         return request("GET", "/api/v1/usage/monthly")
+    }
+
+    /**
+     * Get the daily usage summary for this API key.
+     *
+     * @param date Date to query in YYYY-MM-DD format (default: today).
+     * @return UsageSummaryResult with request counts and quota.
+     */
+    suspend fun getUsageSummary(date: String? = null): UsageSummaryResult {
+        return request("GET", "/api/v1/usage/summary${query("date" to date)}")
+    }
+
+    /**
+     * Get the rate limit and quota state for this API key.
+     *
+     * @return UsageQuotaResult with limits, current counts and what remains.
+     */
+    suspend fun getQuota(): UsageQuotaResult {
+        return request("GET", "/api/v1/usage/quota")
     }
 
     // =========================================================================
@@ -1180,6 +1532,17 @@ class Tuteliq(
         throw NetworkException("Max retries exceeded")
     }
 
+    /**
+     * Appends the upload as the `file` part. The part needs a Content-Type: the API
+     * checks it against the types each endpoint accepts and rejects a part without one.
+     */
+    private fun FormBuilder.appendFile(file: ByteArray, filename: String, contentType: String?) {
+        append("file", file, Headers.build {
+            append(HttpHeaders.ContentDisposition, "filename=\"${escapeFilename(filename)}\"")
+            append(HttpHeaders.ContentType, contentType ?: mimeTypeForFilename(filename) ?: "application/octet-stream")
+        })
+    }
+
     private fun buildDetectionBody(input: DetectionInput): JsonObject {
         return buildJsonObject {
             put("text", input.content)
@@ -1196,6 +1559,14 @@ class Tuteliq(
             input.customerId?.let { put("customer_id", it) }
             input.metadata?.let { put("metadata", mapToJsonObject(it)) }
         }
+    }
+
+    /** Query string from the non-null pairs, encoded; empty when every value is null. */
+    private fun query(vararg pairs: Pair<String, Any?>): String {
+        val parameters = Parameters.build {
+            pairs.forEach { (key, value) -> if (value != null) append(key, value.toString()) }
+        }
+        return if (parameters.isEmpty()) "" else "?${parameters.formUrlEncode()}"
     }
 
     private fun mapToJsonObject(map: Map<String, Any?>): JsonObject {
@@ -1229,3 +1600,20 @@ class Tuteliq(
         }
     }
 }
+
+private val UPLOAD_MIME_TYPES = mapOf(
+    "png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg",
+    "gif" to "image/gif", "webp" to "image/webp",
+    "mp3" to "audio/mpeg", "wav" to "audio/wav", "m4a" to "audio/m4a",
+    "ogg" to "audio/ogg", "flac" to "audio/flac",
+    "mp4" to "video/mp4", "webm" to "video/webm", "mov" to "video/quicktime", "avi" to "video/x-msvideo",
+    "pdf" to "application/pdf"
+)
+
+/** Filename safe inside a quoted header value: line breaks dropped, backslash and quote escaped. */
+internal fun escapeFilename(filename: String): String =
+    filename.replace("\r", "").replace("\n", "").replace("\\", "\\\\").replace("\"", "\\\"")
+
+/** MIME type for an upload, from its filename's extension; null when the extension is unknown. */
+internal fun mimeTypeForFilename(filename: String): String? =
+    UPLOAD_MIME_TYPES[filename.substringAfterLast('.', "").lowercase()]
