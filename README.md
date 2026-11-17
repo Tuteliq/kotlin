@@ -30,7 +30,7 @@
 
 ```kotlin
 dependencies {
-    implementation("ai.tuteliq:tuteliq:2.2.4")
+    implementation("ai.tuteliq:tuteliq:2.5.0")
 }
 ```
 
@@ -38,7 +38,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'ai.tuteliq:tuteliq:2.2.4'
+    implementation 'ai.tuteliq:tuteliq:2.5.0'
 }
 ```
 
@@ -48,7 +48,7 @@ dependencies {
 <dependency>
     <groupId>ai.tuteliq</groupId>
     <artifactId>tuteliq</artifactId>
-    <version>2.2.4</version>
+    <version>2.5.0</version>
 </dependency>
 ```
 
@@ -211,40 +211,130 @@ println("Risk: ${report.riskLevel}")
 println("Next Steps: ${report.recommendedNextSteps}")
 ```
 
-### Age Verification (Beta)
+### Verification Sessions
 
-> **Pro tier ($99/mo)+ required** — 5 credits per request — `POST /v1/verification/age`
-
-```kotlin
-val ageResult = tuteliq.verifyAge(
-    document = File("id-front.jpg"),
-    selfie = File("selfie.jpg"),
-    method = VerificationMethod.COMBINED // DOCUMENT | BIOMETRIC | COMBINED
-)
-
-println(ageResult.verified)       // true
-println(ageResult.estimatedAge)   // 15
-println(ageResult.ageRange)       // "13-15"
-println(ageResult.isMinor)        // true
-println(ageResult.confidence)     // 0.97
-```
-
-### Identity Verification (Beta)
-
-> **Business tier ($349/mo)+ required** — 10 credits per request — `POST /v1/verification/identity`
+Age and identity verification run as a session: create it on your server, send the user to the returned URL (on any device), then poll for the outcome or receive it by webhook. Verification needs a paid plan; see the [docs](https://docs.tuteliq.ai) for plans.
 
 ```kotlin
-val identityResult = tuteliq.verifyIdentity(
-    document = File("id-front.jpg"),
-    selfie = File("selfie.jpg")
+val session = client.createVerificationSession(
+    CreateVerificationSessionInput(
+        mode = VerificationMode.AGE,              // or IDENTITY
+        documentType = DocumentType.PASSPORT,     // optional: PASSPORT, NATIONAL_ID, DRIVERS_LICENSE
+        chipPolicy = ChipPolicy.OPTIONAL,         // optional: OPTIONAL, REQUIRED, INSTEAD_OF_PHOTO
+        autoCapture = true                        // optional: the page takes the document photo itself
+    )
 )
+println(session.url)        // send the user here
+println(session.expiresAt)  // epoch milliseconds
 
-println(identityResult.verified)               // true
-println(identityResult.matchScore)             // 0.98
-println(identityResult.livenessPassed)         // true
-println(identityResult.documentAuthenticated)  // true
-println(identityResult.isMinor)               // false
+val status = client.getVerificationSession(session.sessionId)
+when (status.status) {
+    VerificationSessionStatus.COMPLETED, VerificationSessionStatus.FAILED -> {
+        println(status.result?.status)               // VerificationStatus.VERIFIED, FAILED or NEEDS_REVIEW
+        println(status.result?.isMinor)
+        println(status.result?.faceMatch?.matchScore) // 0.0 to 1.0, 0.5 at the match decision
+    }
+    VerificationSessionStatus.DOCUMENT_REQUIRED -> println("Waiting for a document photo")
+    else -> println("Still in progress: ${status.status}")
+}
+
+client.cancelVerificationSession(session.sessionId)  // the session then reports EXPIRED
 ```
+
+Past results: `getVerification(id)`, `getAgeVerification(id)` and `getIdentityVerification(id)` return the decision and its signals, never extracted document data. `getVerificationConfig(country = "DE")` returns the check that applies in a market.
+
+A status this SDK version does not know decodes to `UNKNOWN` instead of failing.
+
+### Document Analysis
+
+Analyze a PDF, or a single png, jpeg or webp image, page by page:
+
+```kotlin
+val result = client.analyzeDocument(
+    AnalyzeDocumentInput(
+        file = File("chat-export.pdf").readBytes(),
+        filename = "chat-export.pdf",
+        endpoints = listOf("unsafe", "grooming", "bullying")
+    )
+)
+println(result.overallSeverity)
+result.flaggedPages.forEach { println("Page ${it.pageNumber}: ${it.detectedEndpoints}") }
+```
+
+### Synthetic Content
+
+```kotlin
+val text = client.detectSyntheticText(DetectSyntheticTextInput(content = "Text to check"))
+println(text.classification)  // confirmed_synthetic, suspected_synthetic, unknown, confirmed_authentic
+
+val image = client.detectSyntheticImage(DetectSyntheticMediaInput(file = bytes, filename = "photo.jpg"))
+// Also detectSyntheticAudio() and detectSyntheticVideo()
+```
+
+### More Detection
+
+```kotlin
+client.detectDistressSignals("Message to check")
+client.detectTfgbv("Message to check")
+
+val name = client.detectNickname(DetectNicknameInput(name = "PlayerName"))
+println(name.recommendation)  // allow, allow_and_watch, ask_to_rename, hold_for_review
+
+val match = client.verifyImageMatch(
+    VerifyImageMatchInput(image = photoBytes, referenceImage = profileBytes, checks = listOf(ImageMatchCheck.FACE_MATCH, ImageMatchCheck.AGE))
+)
+```
+
+### Incidents
+
+```kotlin
+val page = client.listIncidents(ListIncidentsInput(status = "new", limit = 50))
+page.incidents.forEach { println("${it.id}: ${it.riskCategory} (${it.riskLevel})") }
+val next = page.nextCursor?.let { client.listIncidents(ListIncidentsInput(cursor = it)) }
+
+val incident = client.getIncident("inc_123")
+val overview = client.getIncidentsOverview()
+val trends = client.getIncidentTrends(IncidentTrendBucket.DAY)
+
+client.reviewIncident(
+    "inc_123",
+    ReviewIncidentInput(
+        action = ModeratorAction.DISMISS,
+        reasonCode = ModeratorReasonCode.FALSE_POSITIVE,
+        moderatorExternalId = "moderator_42"
+    )
+)
+// batchReviewIncidents() applies one review to up to 100 incidents.
+```
+
+### Privacy Redaction
+
+Remove personal data from a text, or from a whole conversation with consistent placeholders. Nothing is stored.
+
+```kotlin
+val redacted = client.redact(RedactInput(messages = listOf("Hi, I'm Alex", "Bye Alex")))
+println(redacted.messages)  // the same name gets the same placeholder in both messages
+println(redacted.counts)
+```
+
+### Webhooks
+
+```kotlin
+val created = client.createWebhook(
+    CreateWebhookInput(name = "Moderation", url = "https://example.com/hooks/tuteliq", events = listOf("incident.created"))
+)
+println(created.secret)  // returned only here; store it to verify deliveries
+
+client.updateWebhook(created.id, UpdateWebhookInput(active = false))
+client.testWebhook(created.id)
+client.regenerateWebhookSecret(created.id)
+client.listWebhooks()
+client.deleteWebhook(created.id)
+```
+
+### Uploads
+
+`analyzeImage()`, `analyzeVoice()`, `analyzeVideo()`, `analyzeDocument()` and the synthetic media methods send the file with a MIME type taken from the filename's extension. Pass `contentType` when the filename has no usual extension.
 
 ### Voice Streaming
 
@@ -285,18 +375,7 @@ val result = client.detectBullying("text to analyze")
 println("Credits used: ${result.creditsUsed}")
 ```
 
-| Method | Credits |
-|--------|---------|
-| `detectBullying()` | 1 |
-| `detectUnsafe()` | 1 |
-| `detectGrooming()` | 1 per 10 messages |
-| `analyzeEmotions()` | 1 per 10 messages |
-| `getActionPlan()` | 2 |
-| `generateReport()` | 3 |
-| `analyzeVoice()` | 5 |
-| `analyzeImage()` | 3 |
-| `verifyAge()` | 5 |
-| `verifyIdentity()` | 10 |
+Current credit costs per endpoint are in the [docs](https://docs.tuteliq.ai), or call `getPricingDetails()`.
 
 ---
 
@@ -319,6 +398,8 @@ println(result.metadata)    // {"user_id": "usr_abc", ...}
 ---
 
 ## Usage Tracking
+
+`getUsageSummary()` returns today's request counts and quota, `getQuota()` the rate limit state, and `getUsageHistory()`, `getUsageByTool()` and `getUsageMonthly()` longer views.
 
 ```kotlin
 val result = client.detectBullying("test")
@@ -407,17 +488,17 @@ The **grooming** method already accepts a `messages` list and analyzes the full 
 
 ### PII Redaction
 
-Enable `PII_REDACTION_ENABLED=true` on your Tuteliq API to automatically strip emails, phone numbers, URLs, social handles, IPs, and other PII from detection summaries and webhook payloads. The original text is still analyzed in full — only stored outputs are scrubbed.
+To remove personal data from text you store or share, call `redact()` (see [Privacy Redaction](#privacy-redaction)).
 
 ---
 
 ## Supported Languages
 
-Tuteliq supports **27 languages** with automatic detection — no configuration required.
+Tuteliq supports **32 languages** with automatic detection, no configuration required.
 
-**English** (stable) and **26 beta languages**: Spanish, Portuguese, Ukrainian, Swedish, Norwegian, Danish, Finnish, German, French, Dutch, Polish, Italian, Turkish, Romanian, Greek, Czech, Hungarian, Bulgarian, Croatian, Slovak, Lithuanian, Latvian, Estonian, Slovenian, Maltese, and Irish.
+**English** (stable) and **31 beta languages**: Spanish, Portuguese, Ukrainian, Swedish, Norwegian, Danish, Finnish, German, French, Dutch, Polish, Italian, Turkish, Romanian, Greek, Czech, Hungarian, Bulgarian, Croatian, Slovak, Lithuanian, Latvian, Estonian, Slovenian, Maltese, Irish, Chinese, Japanese, Korean, Arabic and Russian.
 
-All 24 EU official languages + Ukrainian, Norwegian, and Turkish. Each language includes culture-specific safety guidelines covering local slang, grooming patterns, self-harm coded vocabulary, and filter evasion techniques.
+The `Language` enum lists the codes for an explicit language hint.
 
 See the [Language Support docs](https://docs.tuteliq.ai/languages) for details.
 
