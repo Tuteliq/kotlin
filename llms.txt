@@ -8,7 +8,7 @@ A Kotlin library for the Tuteliq child safety API. Detect bullying, grooming, se
 ## Install
 // build.gradle.kts
 dependencies {
-    implementation("ai.tuteliq:tuteliq:2.5.0")
+    implementation("ai.tuteliq:tuteliq:3.0.0")
 }
 
 ## Quick Start
