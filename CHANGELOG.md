@@ -1,8 +1,15 @@
-## [2.5.0] - Unreleased
+## [3.0.0] - 2026-11-17
 
-Versions 2.3.0 and 2.4.0 were never published to Maven Central; this release includes their changes.
+Versions 2.3.0, 2.4.0 and 2.5.0 were never published to Maven Central; this release includes their changes. It is a major version because a few public types changed (see Breaking changes).
+
+### Breaking changes
+- `VerificationSession.expiresAt` and `VerificationSessionResult.createdAt`/`expiresAt` are `Long` (epoch ms), no longer strings.
+- `VerificationSessionResult.result` is a typed `VerificationResult`, no longer a `JsonObject`.
+- Webhook result models are flat, as the API returns them.
+- New enum entries (including `UNKNOWN`) may require an `else` branch in exhaustive `when`.
 
 ### Fixed
+- IDs in request paths (verification sessions, age/identity lookups, webhooks) are URL-encoded, and upload filenames are escaped in the part header.
 - File uploads (`analyzeImage`, `analyzeVoice`, `analyzeVideo`) now send the file's MIME type, taken from the filename or the new `contentType` parameter. The API rejected uploads without one.
 - `VerificationSessionStatus` decodes `document_required`; unknown verification statuses decode to `UNKNOWN` instead of throwing. `CANCELLED` is deprecated: a cancelled session reports `EXPIRED`.
 - `cancelVerificationSession` accepts the API's `{ "ok": true }` response.
@@ -24,7 +31,6 @@ Versions 2.3.0 and 2.4.0 were never published to Maven Central; this release inc
 - `Language` lists all 32 supported languages; `Detection` adds `DISTRESS_SIGNALS`, `TFGBV`, `SYNTHETIC_CONTENT`.
 
 ### Changed
-- `VerificationSession.expiresAt` and `VerificationSessionResult.createdAt`/`expiresAt` are epoch milliseconds (`Long`), as the API returns them.
 - `CreateWebhookInput` takes a `name`. The old constructor is deprecated and uses the URL's host as the name.
 
 ## [1.2.0] - 2026-02-16

@@ -30,7 +30,7 @@
 
 ```kotlin
 dependencies {
-    implementation("ai.tuteliq:tuteliq:2.5.0")
+    implementation("ai.tuteliq:tuteliq:3.0.0")
 }
 ```
 
@@ -38,7 +38,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'ai.tuteliq:tuteliq:2.5.0'
+    implementation 'ai.tuteliq:tuteliq:3.0.0'
 }
 ```
 
@@ -48,7 +48,7 @@ dependencies {
 <dependency>
     <groupId>ai.tuteliq</groupId>
     <artifactId>tuteliq</artifactId>
-    <version>2.5.0</version>
+    <version>3.0.0</version>
 </dependency>
 ```
 
