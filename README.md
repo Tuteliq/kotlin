@@ -184,12 +184,18 @@ val plan = client.getActionPlan(
         childAge = 12,
         audience = Audience.CHILD,
         severity = Severity.MEDIUM,
+        country = "SE",
     )
 )
 
 println("Steps: ${plan.steps}")
 println("Tone: ${plan.tone}")
+println("General guidance: ${plan.generalGuidance}")
 ```
+
+`country` is the family's country as an ISO 3166-1 alpha-2 code (for example `"SE"`), so the plan names that country's helplines and emergency number. It defaults to the account's country; with neither, the plan names the kind of service to contact.
+
+`generalGuidance` is `true` when the plan is general guidance for any harm, given because a plan tailored to the situation could not be written.
 
 ### Incident Report
 

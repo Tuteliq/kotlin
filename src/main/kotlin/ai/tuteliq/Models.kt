@@ -117,7 +117,9 @@ data class GetActionPlanInput(
     val audience: Audience? = null,
     val severity: Severity? = null,
     val externalId: String? = null,
-    val metadata: Map<String, Any>? = null
+    val metadata: Map<String, Any>? = null,
+    /** The family's country as an ISO 3166-1 alpha-2 code (for example "SE"), so the plan names that country's helplines and emergency number. Defaults to the account's country. */
+    val country: String? = null
 )
 
 /**
@@ -258,7 +260,9 @@ data class ActionPlanResult(
     val urgency: String,
     @SerialName("external_id") val externalId: String? = null,
     val metadata: JsonObject? = null,
-    @SerialName("credits_used") val creditsUsed: Int? = null
+    @SerialName("credits_used") val creditsUsed: Int? = null,
+    /** True when the plan is general guidance for any harm, given because a plan tailored to the situation could not be written. */
+    @SerialName("general_guidance") val generalGuidance: Boolean = false
 )
 
 /**
