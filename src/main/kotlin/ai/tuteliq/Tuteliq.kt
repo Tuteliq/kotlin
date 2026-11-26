@@ -394,6 +394,7 @@ class Tuteliq internal constructor(
             put("context", buildJsonObject { put("platform", resolvePlatform()) })
             input.childAge?.let { put("child_age", it) }
             input.severity?.let { put("severity", it.name.lowercase()) }
+            input.country?.let { put("country", it) }
             input.externalId?.let { put("external_id", it) }
             input.metadata?.let { put("metadata", mapToJsonObject(it)) }
         }

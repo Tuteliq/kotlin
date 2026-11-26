@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Added
+- `GetActionPlanInput.country`: the family's country as an ISO 3166-1 alpha-2 code, so the plan names that country's helplines and emergency number.
+- `ActionPlanResult.generalGuidance`: true when the plan is general guidance for any harm, given because a plan tailored to the situation could not be written.
+
 ## [3.0.0] - 2026-11-17
 
 Versions 2.3.0, 2.4.0 and 2.5.0 were never published to Maven Central; this release includes their changes. It is a major version because a few public types changed (see Breaking changes).

@@ -460,6 +460,36 @@ class ApiContractTest {
         assertFalse(body.contains("\nX: y.png"), body)
     }
 
+    // =========================================================================
+    // Action plan
+    // =========================================================================
+
+    private val actionPlanResponse = """{"steps":["Invented step"],"tone":"calm","resources":[],"urgency":"low"}"""
+
+    @Test
+    fun `action plan sends country when set`() = runTest {
+        val stub = Stub(actionPlanResponse)
+        stub.client().getActionPlan(GetActionPlanInput(situation = "Invented situation", country = "SE"))
+        assertEquals("/api/v1/guidance/action-plan", stub.last.url.encodedPath)
+        assertEquals("SE", stub.lastJson["country"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `action plan omits country when not set`() = runTest {
+        val stub = Stub(actionPlanResponse)
+        stub.client().getActionPlan(GetActionPlanInput(situation = "Invented situation"))
+        assertFalse(stub.lastJson.containsKey("country"), stub.lastJson.toString())
+    }
+
+    @Test
+    fun `action plan decodes general_guidance`() = runTest {
+        val general = Stub("""{"steps":["Invented step"],"tone":"calm","resources":[],"urgency":"low","general_guidance":true}""")
+        assertTrue(general.client().getActionPlan(GetActionPlanInput(situation = "Invented situation")).generalGuidance)
+
+        val tailored = Stub(actionPlanResponse)
+        assertFalse(tailored.client().getActionPlan(GetActionPlanInput(situation = "Invented situation")).generalGuidance)
+    }
+
     @Test
     fun `ID_CARD wire value decodes to NATIONAL_ID`() {
         val decoded = Json.decodeFromString<DocumentType>("\"national_id\"")
